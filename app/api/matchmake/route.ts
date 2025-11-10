@@ -200,12 +200,32 @@ export async function POST(req: Request) {
     }
 
     // ===== Create game tables (2 teams = 4 players per table) =====
+    // Maximum 6 tables per session (24 players)
+    const MAX_TABLES_PER_SESSION = 6
     const tablesCreated = []
     const waitlistTeams = []
 
-    for (let i = 0; i < teams.length; i += 2) {
-      const team1 = teams[i]
-      const team2 = teams[i + 1]
+    // Calculate how many tables we can create (max 6)
+    const maxTablesToCreate = Math.min(Math.floor(teams.length / 2), MAX_TABLES_PER_SESSION)
+    const teamsToAssign = teams.slice(0, maxTablesToCreate * 2)
+    const remainingTeams = teams.slice(maxTablesToCreate * 2)
+
+    console.log(`[v0] Creating ${maxTablesToCreate} tables from ${teams.length} teams (max ${MAX_TABLES_PER_SESSION})`)
+
+    // Get next available table number for this session
+    const { data: existingTables } = await supabase
+      .from("game_tables")
+      .select("table_number")
+      .order("table_number", { ascending: false })
+      .limit(1)
+
+    let nextTableNumber = existingTables && existingTables.length > 0
+      ? existingTables[0].table_number + 1
+      : 1
+
+    for (let i = 0; i < teamsToAssign.length; i += 2) {
+      const team1 = teamsToAssign[i]
+      const team2 = teamsToAssign[i + 1]
 
       if (!team2) {
         // Odd team out - put on waitlist
@@ -222,16 +242,7 @@ export async function POST(req: Request) {
         break
       }
 
-      // Get next available table number
-      const { data: existingTables } = await supabase
-        .from("game_tables")
-        .select("table_number")
-        .order("table_number", { ascending: false })
-        .limit(1)
-
-      const tableNumber = existingTables && existingTables.length > 0
-        ? existingTables[0].table_number + 1
-        : 1
+      const tableNumber = nextTableNumber++
 
       // Create game table
       const { data: gameTable, error: tableError } = await supabase
@@ -284,12 +295,28 @@ export async function POST(req: Request) {
       }
     }
 
+    // Put remaining teams on waitlist if we hit the table limit
+    for (const team of remainingTeams) {
+      const { error: waitlistError } = await supabase
+        .from("teams")
+        .update({ status: "waitlist" })
+        .eq("id", team.id)
+
+      if (waitlistError) {
+        console.error("[v0] Error updating team to waitlist:", waitlistError)
+      } else {
+        waitlistTeams.push(team)
+        console.log(`[v0] Team ${team.id} put on waitlist (session at max capacity)`)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       teamsCreated: teams.length,
       tablesCreated: tablesCreated.length,
       waitlistTeams: waitlistTeams.length,
       unpairedPlayers: soloPlayers.length % 2,
+      maxTablesReached: tablesCreated.length >= MAX_TABLES_PER_SESSION,
     })
   } catch (error) {
     console.error("[v0] Error in matchmake API:", error)

@@ -43,7 +43,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // Check if we can connect to Supabase
+    // Check session-1 player count (max 24 players = 6 tables × 4 players)
     const { data: session1Players, error: countError } = await supabase
       .from("players")
       .select("id")
@@ -62,9 +62,38 @@ export async function POST(req: Request) {
     }
 
     const session1Count = session1Players?.length || 0
-    const assignedSessionId = session1Count >= 28 ? "session-2" : "session-1"
+    const MAX_PLAYERS_PER_SESSION = 24 // 6 tables × 4 players
+    const assignedSessionId = session1Count >= MAX_PLAYERS_PER_SESSION ? "session-2" : "session-1"
 
-    console.log("[v0] Assigning to session:", assignedSessionId, "Current count:", session1Count)
+    console.log("[v0] Assigning to session:", assignedSessionId, "Session 1 count:", session1Count, "Max:", MAX_PLAYERS_PER_SESSION)
+
+    // If assigning to session-2, ensure it exists
+    if (assignedSessionId === "session-2") {
+      const { data: existingSessions } = await supabase
+        .from("sessions")
+        .select("id")
+        .eq("id", "session-2")
+        .single()
+
+      if (!existingSessions) {
+        // Create session-2 if it doesn't exist
+        const { error: createSessionError } = await supabase
+          .from("sessions")
+          .insert({
+            id: "session-2",
+            name: "Evening Session 2",
+            start_time: "8:00 PM",
+            max_players: MAX_PLAYERS_PER_SESSION,
+          })
+
+        if (createSessionError) {
+          console.error("[v0] Error creating session-2:", createSessionError)
+          // Continue anyway - session might already exist
+        } else {
+          console.log("[v0] Created session-2 automatically")
+        }
+      }
+    }
 
     const { data: player, error: insertError } = await supabase
       .from("players")

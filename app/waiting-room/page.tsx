@@ -15,7 +15,7 @@ export default function WaitingRoom() {
   const [tableNumber, setTableNumber] = useState<number | null>(null)
   const [currentSession, setCurrentSession] = useState<string>("Session 1")
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null)
-  const maxSpots = 28
+  const maxSpots = 24 // 6 tables × 4 players per session
   const router = useRouter()
   const supabase = createClient()
 

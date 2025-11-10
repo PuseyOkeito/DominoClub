@@ -261,16 +261,25 @@ export async function POST(req: Request) {
 
         if (teamsUpdateError) {
           console.error("[v0] Error updating teams:", teamsUpdateError)
+        } else {
+          console.log(`[v0] Updated teams ${team1.id} and ${team2.id} to table ${tableNumber}`)
         }
 
-        // Update players status to assigned
+        // Update players status to assigned AND set table_id
+        const playerIds = [team1.player1_id, team1.player2_id, team2.player1_id, team2.player2_id]
         const { error: playersUpdateError } = await supabase
           .from("players")
-          .update({ status: "assigned" })
-          .in("id", [team1.player1_id, team1.player2_id, team2.player1_id, team2.player2_id])
+          .update({ 
+            status: "assigned",
+            table_id: gameTable.id  // Set the table_id to the game_table UUID
+          })
+          .in("id", playerIds)
 
         if (playersUpdateError) {
           console.error("[v0] Error updating players:", playersUpdateError)
+          console.error("[v0] Player IDs attempted:", playerIds)
+        } else {
+          console.log(`[v0] Updated ${playerIds.length} players to assigned status with table_id: ${gameTable.id}`)
         }
       }
     }

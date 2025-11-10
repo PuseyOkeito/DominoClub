@@ -123,6 +123,10 @@ export function CheckInForm() {
         partnerName: result.player.partner_name,
       })
       localStorage.setItem("session-players", JSON.stringify(players))
+      
+      // Store current player ID for easy access
+      localStorage.setItem("current-player-id", result.player.id)
+      console.log("[v0] Stored current player ID:", result.player.id)
 
       localStorage.removeItem("checkin-state")
       

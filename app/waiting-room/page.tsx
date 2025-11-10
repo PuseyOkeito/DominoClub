@@ -20,11 +20,38 @@ export default function WaitingRoom() {
   const supabase = createClient()
 
   useEffect(() => {
-    const savedPlayers = localStorage.getItem("session-players")
-    if (savedPlayers) {
-      const parsedPlayers = JSON.parse(savedPlayers)
-      if (parsedPlayers.length > 0) {
-        setCurrentPlayerId(parsedPlayers[parsedPlayers.length - 1].id)
+    // Get current player ID - check localStorage first, then database
+    const loadCurrentPlayer = async () => {
+      // First check localStorage (set when player joins)
+      const savedPlayerId = localStorage.getItem("current-player-id")
+      if (savedPlayerId) {
+        setCurrentPlayerId(savedPlayerId)
+        console.log("[v0] Set current player ID from localStorage:", savedPlayerId)
+        return
+      }
+
+      // Fallback: get most recent player from database
+      const { data: recentPlayers } = await supabase
+        .from("players")
+        .select("id")
+        .order("created_at", { ascending: false })
+        .limit(1)
+
+      if (recentPlayers && recentPlayers.length > 0) {
+        setCurrentPlayerId(recentPlayers[0].id)
+        localStorage.setItem("current-player-id", recentPlayers[0].id)
+        console.log("[v0] Set current player ID from database:", recentPlayers[0].id)
+      } else {
+        // Last fallback: localStorage session-players
+        const savedPlayers = localStorage.getItem("session-players")
+        if (savedPlayers) {
+          const parsedPlayers = JSON.parse(savedPlayers)
+          if (parsedPlayers.length > 0) {
+            const playerId = parsedPlayers[parsedPlayers.length - 1].id
+            setCurrentPlayerId(playerId)
+            localStorage.setItem("current-player-id", playerId)
+          }
+        }
       }
     }
 
@@ -53,6 +80,8 @@ export default function WaitingRoom() {
       }
     }
 
+    loadCurrentPlayer()
+
     const loadWaitlist = async () => {
       const { data, error } = await supabase.from("teams").select("*").eq("status", "waitlist")
 
@@ -79,51 +108,122 @@ export default function WaitingRoom() {
 
     const teamsChannel = supabase
       .channel("teams-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, async () => {
         console.log("[v0] Teams changed, reloading...")
         loadWaitlist()
+        // Check if current player's team was updated
+        if (currentPlayerId) {
+          const { data: teamData, error } = await supabase
+            .from("teams")
+            .select("table_number")
+            .or(`player1_id.eq.${currentPlayerId},player2_id.eq.${currentPlayerId}`)
+            .single()
+
+          if (!error && teamData && teamData.table_number) {
+            console.log("[v0] Player assigned to table via realtime:", teamData.table_number)
+            setTableNumber(teamData.table_number)
+            if (!gameStarted) {
+              setGameStarted(true)
+              alert('The game has started! Click "See Your Table" to join.')
+            }
+          }
+        }
+      })
+      .subscribe()
+
+    const gameStateChannel = supabase
+      .channel("game-state-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "game_state" }, async (payload) => {
+        console.log("[v0] Game state changed:", payload)
+        if (payload.new && (payload.new as any).started) {
+          setGameStarted(true)
+          if (currentPlayerId) {
+            const { data: teamData, error } = await supabase
+              .from("teams")
+              .select("table_number")
+              .or(`player1_id.eq.${currentPlayerId},player2_id.eq.${currentPlayerId}`)
+              .single()
+
+            if (!error && teamData && teamData.table_number) {
+              console.log("[v0] Player assigned to table via game state change:", teamData.table_number)
+              setTableNumber(teamData.table_number)
+              alert('The game has started! Click "See Your Table" to join.')
+            }
+          }
+        }
       })
       .subscribe()
 
     return () => {
       supabase.removeChannel(playersChannel)
       supabase.removeChannel(teamsChannel)
+      supabase.removeChannel(gameStateChannel)
     }
-  }, [])
+  }, [currentPlayerId, supabase, gameStarted])
 
   useEffect(() => {
+    if (!currentPlayerId) return
+
+    const checkPlayerTableAssignment = async () => {
+      try {
+        // Check if player has been assigned to a team and table
+        const { data: teamData, error: teamError } = await supabase
+          .from("teams")
+          .select("table_number")
+          .or(`player1_id.eq.${currentPlayerId},player2_id.eq.${currentPlayerId}`)
+          .single()
+
+        if (teamError) {
+          // No team found yet, that's okay
+          return
+        }
+
+        if (teamData && teamData.table_number) {
+          console.log("[v0] Player assigned to table:", teamData.table_number)
+          setTableNumber(teamData.table_number)
+          if (!gameStarted) {
+            setGameStarted(true)
+            alert('The game has started! Click "See Your Table" to join.')
+          }
+        }
+      } catch (error) {
+        console.error("[v0] Failed to check player assignment:", error)
+      }
+    }
+
     const pollGameState = async () => {
       try {
-        const response = await fetch("/api/game")
+        // Use the database game_state endpoint, not the in-memory one
+        const response = await fetch("/api/start-game")
         const data = await response.json()
 
-        if (data.started && !gameStarted) {
-          console.log("[v0] Game started!")
-          setGameStarted(true)
-
-          if (currentPlayerId) {
-            const { data: playerData, error } = await supabase
-              .from("players")
-              .select("*, teams!inner(table_number)")
-              .eq("id", currentPlayerId)
-              .single()
-
-            if (playerData && playerData.teams?.table_number) {
-              setTableNumber(playerData.teams.table_number)
-              console.log("[v0] Player assigned to table:", playerData.teams.table_number)
-            }
+        if (data.started) {
+          if (!gameStarted) {
+            console.log("[v0] Game started! Checking player assignment...")
+            setGameStarted(true)
           }
-
-          alert('The game has started! Click "See Your Table" to join.')
+          
+          // Always check player assignment when game is started
+          await checkPlayerTableAssignment()
         }
       } catch (error) {
         console.error("[v0] Failed to poll game state:", error)
       }
     }
 
-    const pollInterval = setInterval(pollGameState, 3000)
-    return () => clearInterval(pollInterval)
-  }, [gameStarted, currentPlayerId])
+    // Poll immediately, then every 2 seconds
+    pollGameState()
+    const pollInterval = setInterval(pollGameState, 2000)
+    
+    // Also check player assignment every 2 seconds
+    checkPlayerTableAssignment()
+    const checkInterval = setInterval(checkPlayerTableAssignment, 2000)
+
+    return () => {
+      clearInterval(pollInterval)
+      clearInterval(checkInterval)
+    }
+  }, [gameStarted, currentPlayerId, supabase])
 
   const progressPercentage = (spotsFilled / maxSpots) * 100
 

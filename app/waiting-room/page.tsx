@@ -162,11 +162,51 @@ export default function WaitingRoom() {
   }, [currentPlayerId, supabase, gameStarted])
 
   useEffect(() => {
-    if (!currentPlayerId) return
+    if (!currentPlayerId) {
+      console.log("[v0] No currentPlayerId, skipping table assignment check")
+      return
+    }
 
     const checkPlayerTableAssignment = async () => {
       try {
-        // Check if player has been assigned to a team and table
+        // First check player status and table_id directly
+        const { data: playerData, error: playerError } = await supabase
+          .from("players")
+          .select("id, status, table_id")
+          .eq("id", currentPlayerId)
+          .single()
+
+        if (playerError) {
+          console.error("[v0] Error checking player:", playerError)
+          return
+        }
+
+        console.log("[v0] Player data:", { 
+          id: playerData?.id, 
+          status: playerData?.status, 
+          table_id: playerData?.table_id 
+        })
+
+        // If player has table_id, get the table number from game_tables
+        if (playerData && playerData.table_id) {
+          const { data: tableData, error: tableError } = await supabase
+            .from("game_tables")
+            .select("table_number")
+            .eq("id", playerData.table_id)
+            .single()
+
+          if (!tableError && tableData && tableData.table_number) {
+            console.log("[v0] Player has table_id, found table number:", tableData.table_number)
+            setTableNumber(tableData.table_number)
+            if (!gameStarted) {
+              setGameStarted(true)
+              alert('The game has started! Click "See Your Table" to join.')
+            }
+            return
+          }
+        }
+
+        // Fallback: Check teams table for table_number
         const { data: teamData, error: teamError } = await supabase
           .from("teams")
           .select("table_number")
@@ -179,7 +219,7 @@ export default function WaitingRoom() {
         }
 
         if (teamData && teamData.table_number) {
-          console.log("[v0] Player assigned to table:", teamData.table_number)
+          console.log("[v0] Player assigned to table via teams table:", teamData.table_number)
           setTableNumber(teamData.table_number)
           if (!gameStarted) {
             setGameStarted(true)
@@ -196,6 +236,8 @@ export default function WaitingRoom() {
         // Use the database game_state endpoint, not the in-memory one
         const response = await fetch("/api/start-game")
         const data = await response.json()
+
+        console.log("[v0] Game state poll:", data)
 
         if (data.started) {
           if (!gameStarted) {

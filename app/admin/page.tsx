@@ -28,7 +28,7 @@ export default function AdminPage() {
   const [password, setPassword] = useState("")
   const [passwordError, setPasswordError] = useState(false)
   const [sessions, setSessions] = useState<Session[]>([])
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>("session-1") // Default to session-1
   const [timerActive, setTimerActive] = useState(false)
   const [timeRemaining, setTimeRemaining] = useState(300)
   const [players, setPlayers] = useState<Player[]>([])
@@ -113,10 +113,14 @@ export default function AdminPage() {
           }))
           setSessions(formattedSessions)
           
-          // Auto-select first session
-          if (formattedSessions.length > 0 && !selectedSessionId) {
-            console.log("[v0] Auto-selecting session:", formattedSessions[0].id)
-            setSelectedSessionId(formattedSessions[0].id)
+          // Auto-select first session if not already selected
+          if (formattedSessions.length > 0) {
+            const firstSessionId = formattedSessions[0].id
+            // Only update if different from current selection
+            if (selectedSessionId !== firstSessionId) {
+              console.log("[v0] Auto-selecting session:", firstSessionId)
+              setSelectedSessionId(firstSessionId)
+            }
           }
         } else {
           // If no sessions exist, create default one
@@ -124,6 +128,10 @@ export default function AdminPage() {
             { id: "session-1", name: "Evening Session 1", startTime: "6:00 PM", maxPlayers: 24, players: [] },
           ]
           setSessions(defaultSessions)
+          // Ensure session-1 is selected
+          if (!selectedSessionId || selectedSessionId !== "session-1") {
+            setSelectedSessionId("session-1")
+          }
         }
       } catch (error) {
         console.error("[v0] Error loading sessions:", error)
@@ -773,6 +781,8 @@ export default function AdminPage() {
         {selectedSessionId && (() => {
           const sessionPlayers = players.filter((p: any) => p.session_id === selectedSessionId)
           console.log("[v0] Selected session:", selectedSessionId, "Filtered players:", sessionPlayers.length, "Total players:", players.length)
+          console.log("[v0] All player session IDs:", players.map((p: any) => p.session_id))
+          console.log("[v0] Session players:", sessionPlayers)
           return (
             <Card className="p-6 bg-[#F2F7F7] border-4 border-[#1a1a2e]">
               <div className="space-y-6">
@@ -805,9 +815,21 @@ export default function AdminPage() {
                   <div className="bg-white rounded-xl p-4 border-2 border-[#1a1a2e] max-h-64 overflow-y-auto">
                     {sessionPlayers.length === 0 ? (
                       <div className="text-sm text-[#6b7280] text-center py-4 space-y-2">
-                        <p>No players in this session...</p>
+                        <p>No players in session "{selectedSessionId}"...</p>
                         {players.length > 0 && (
-                          <p className="text-xs">(Total players in database: {players.length})</p>
+                          <>
+                            <p className="text-xs">(Total players in database: {players.length})</p>
+                            <div className="mt-4 text-left">
+                              <p className="text-xs font-semibold mb-2">All players in database:</p>
+                              <div className="space-y-1 max-h-32 overflow-y-auto">
+                                {players.map((player: any) => (
+                                  <div key={player.id} className="text-xs p-2 bg-[#F2F7F7] rounded">
+                                    {player.name} (session: {player.session_id || 'none'})
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </>
                         )}
                       </div>
                     ) : (
@@ -819,9 +841,11 @@ export default function AdminPage() {
                           >
                             <div>
                               <span className="text-sm font-medium text-[#1a1a2e]">{player.name}</span>
-                              <span className="text-xs text-[#6b7280] ml-2">
-                                (session: {player.session_id || 'none'})
-                              </span>
+                              {player.has_partner && (
+                                <span className="text-xs text-[#6b7280] ml-2">
+                                  (partner: {player.partner_name || 'unknown'})
+                                </span>
+                              )}
                             </div>
                             <Button
                               size="sm"

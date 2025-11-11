@@ -620,7 +620,13 @@ export default function WaitingRoom() {
         >
           <div className="bg-[#1a1a2e] text-[#F2F7F7] p-6 rounded-t-xl text-center border-b-4 border-[#1a1a2e]">
             <h1 className="text-2xl font-bold mb-2">Waiting Room</h1>
-            <p className="text-base opacity-90">Waiting for admin to start the game</p>
+            <p className="text-base opacity-90">
+              {roundFinished 
+                ? "Round finished! Click 'Play Again' to join a new game"
+                : gameStarted && tableNumber
+                ? "Your table has been assigned."
+                : "Waiting for admin to start the game"}
+            </p>
             <p className="text-sm opacity-75 mt-2">You're in {currentSession}</p>
           </div>
 

@@ -121,11 +121,11 @@ export default function WaitingRoom() {
       }
 
       if (data) {
-        setPlayers(data)
+        setPlayers(data || [])
 
         // Determine session based on player count
-        const session1Players = data.filter((p: any) => p.session_id === "session-1")
-        const session2Players = data.filter((p: any) => p.session_id === "session-2")
+        const session1Players = (data || []).filter((p: any) => p.session_id === "session-1")
+        const session2Players = (data || []).filter((p: any) => p.session_id === "session-2")
 
         if (session2Players.length > 0) {
           setCurrentSession("Session 2")
@@ -134,6 +134,11 @@ export default function WaitingRoom() {
           setCurrentSession("Session 1")
           setSpotsFilled(session1Players.length)
         }
+      } else {
+        // Handle case when data is null/undefined (0 players)
+        setPlayers([])
+        setCurrentSession("Session 1")
+        setSpotsFilled(0)
       }
     }
 
@@ -148,7 +153,9 @@ export default function WaitingRoom() {
       }
 
       if (data) {
-        setWaitlistTeams(data)
+        setWaitlistTeams(data || [])
+      } else {
+        setWaitlistTeams([])
       }
     }
 
@@ -397,10 +404,10 @@ export default function WaitingRoom() {
             // Reload players to show fresh waiting room
             const reloadPlayers = async () => {
               const { data, error } = await supabase.from("players").select("*").order("created_at", { ascending: true })
-              if (!error && data) {
-                setPlayers(data)
-                const session1Players = data.filter((p: any) => p.session_id === "session-1")
-                const session2Players = data.filter((p: any) => p.session_id === "session-2")
+              if (!error) {
+                setPlayers(data || [])
+                const session1Players = (data || []).filter((p: any) => p.session_id === "session-1")
+                const session2Players = (data || []).filter((p: any) => p.session_id === "session-2")
                 if (session2Players.length > 0) {
                   setCurrentSession("Session 2")
                   setSpotsFilled(session2Players.length)

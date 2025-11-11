@@ -540,13 +540,14 @@ export default function AdminPage() {
       console.log("[v0] Reset session result:", result)
 
       // Reload players and sessions
-      const { data: playersData } = await supabase.from("players").select("*").order("created_at", { ascending: true })
+      const supabaseClient = createClient()
+      const { data: playersData } = await supabaseClient.from("players").select("*").order("created_at", { ascending: true })
       if (playersData) {
         setPlayers(playersData)
       }
 
       // Reload waitlist
-      const { data: teamsData } = await supabase.from("teams").select("*").eq("status", "waitlist")
+      const { data: teamsData } = await supabaseClient.from("teams").select("*").eq("status", "waitlist")
       if (teamsData) {
         setWaitlistTeams(teamsData)
       }

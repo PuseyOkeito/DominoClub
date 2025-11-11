@@ -99,6 +99,13 @@ export async function POST(req: Request) {
     const partneredPlayers = players.filter((p) => p.has_partner && p.partner_name)
     const soloPlayers = players.filter((p) => !p.has_partner)
 
+    console.log(`[v0] Player breakdown:`, {
+      total: players.length,
+      partnered: partneredPlayers.length,
+      solo: soloPlayers.length,
+      partneredNames: partneredPlayers.map(p => ({ name: p.name, partner: p.partner_name }))
+    })
+
     // ===== IMPROVED: Match partnered players by partner_name =====
     // Create a map to find partners
     const partnerMap = new Map<string, typeof players[0]>()
@@ -129,6 +136,7 @@ export async function POST(req: Request) {
 
       if (partner) {
         // Found the partner! Create team
+        console.log(`[v0] ✅ Found partner match: ${player.name} ↔ ${partner.name}`)
         const { data: team, error: teamError } = await supabase
           .from("teams")
           .insert({
@@ -142,20 +150,33 @@ export async function POST(req: Request) {
           .single()
 
         if (teamError) {
-          console.error("[v0] Error creating partnered team:", teamError)
+          console.error("[v0] ❌ Error creating partnered team:", teamError)
+          console.error("[v0] Error details:", {
+            message: teamError.message,
+            code: teamError.code,
+            details: teamError.details
+          })
         } else if (team) {
+          console.log(`[v0] ✅ Created partnered team: ${team.id}`)
           teams.push(team)
           matchedPartners.add(player.id)
           matchedPartners.add(partner.id)
         }
       } else {
         // Partner not found yet, add to unpaired list
+        console.log(`[v0] ⚠️ Partner not found for ${player.name} (looking for: ${partnerName})`)
         unpairedPartners.push(player)
       }
     }
 
     // Add unpaired partners to solo players pool
     soloPlayers.push(...unpairedPartners)
+    
+    console.log(`[v0] After partner matching:`, {
+      teamsCreated: teams.length,
+      unpairedPartners: unpairedPartners.length,
+      soloPlayersRemaining: soloPlayers.length
+    })
 
     // ===== Create teams from solo players =====
     for (let i = 0; i < soloPlayers.length; i += 2) {
@@ -168,6 +189,7 @@ export async function POST(req: Request) {
         break
       }
 
+      console.log(`[v0] Creating solo team: ${p1.name} + ${p2.name}`)
       const { data: team, error: teamError } = await supabase
         .from("teams")
         .insert({
@@ -181,13 +203,22 @@ export async function POST(req: Request) {
         .single()
 
       if (teamError) {
-        console.error("[v0] Error creating solo team:", teamError)
+        console.error("[v0] ❌ Error creating solo team:", teamError)
+        console.error("[v0] Error details:", {
+          message: teamError.message,
+          code: teamError.code,
+          details: teamError.details
+        })
       } else if (team) {
+        console.log(`[v0] ✅ Created solo team: ${team.id}`)
         teams.push(team)
       }
     }
 
+    console.log(`[v0] Final team count: ${teams.length} teams from ${players.length} players`)
+    
     if (teams.length === 0) {
+      console.error("[v0] ❌ No teams could be created!")
       return NextResponse.json(
         {
           error: "No teams could be created",
@@ -197,6 +228,10 @@ export async function POST(req: Request) {
         },
         { status: 400 },
       )
+    }
+    
+    if (teams.length < 2) {
+      console.warn(`[v0] ⚠️ Only ${teams.length} team(s) created - need at least 2 teams to create a table`)
     }
 
     // ===== Create game tables (2 teams = 4 players per table) =====

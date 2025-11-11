@@ -921,30 +921,29 @@ export default function AdminPage() {
                               )}
                             </div>
                           </div>
-                        </div>
-                      </Button>
-                      {!isEditing && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className={`h-8 ${
-                            selectedSessionId === session.id
-                              ? "text-[#F2F7F7] hover:bg-[#2a2a3e]"
-                              : "text-[#1a1a2e] hover:bg-[#e0e8e8]"
-                          }`}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleEditClick(session)
-                          }}
-                        >
-                          <Clock className="w-4 h-4" />
                         </Button>
-                      )}
+                        {!isEditing && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className={`h-8 ${
+                              selectedSessionId === session.id
+                                ? "text-[#F2F7F7] hover:bg-[#2a2a3e]"
+                                : "text-[#1a1a2e] hover:bg-[#e0e8e8]"
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleEditClick(session)
+                            }}
+                          >
+                            <Clock className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
           </div>
         </Card>
 

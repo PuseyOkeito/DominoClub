@@ -48,15 +48,15 @@ export async function GET() {
       .from("game_state")
       .select("timer_active, timer_end_time")
       .eq("id", "current")
-      .single()
+      .maybeSingle()
 
-    if (error) {
-      console.error("[v0] Error getting timer:", error)
-      return NextResponse.json({ error: error.message }, { status: 400 })
-    }
-
-    if (!data) {
-      return NextResponse.json({ timer_active: false, timer_end_time: null })
+    // If no row found or error, return inactive timer
+    if (error || !data) {
+      return NextResponse.json({ 
+        timer_active: false, 
+        timer_end_time: null,
+        time_remaining: 0
+      })
     }
 
     // Calculate remaining time
@@ -82,7 +82,12 @@ export async function GET() {
     })
   } catch (error) {
     console.error("[v0] Error in timer GET API:", error)
-    return NextResponse.json({ error: "Failed to get timer" }, { status: 500 })
+    // Return inactive timer on error instead of 500
+    return NextResponse.json({ 
+      timer_active: false, 
+      timer_end_time: null,
+      time_remaining: 0
+    })
   }
 }
 

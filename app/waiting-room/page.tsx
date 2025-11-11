@@ -115,13 +115,21 @@ export default function WaitingRoom() {
         loadWaitlist()
         // Check if current player's team was updated
         if (currentPlayerId) {
-          const { data: teamData, error } = await supabase
+          const { data: teamData1 } = await supabase
             .from("teams")
             .select("table_number")
-            .or(`player1_id.eq.${currentPlayerId},player2_id.eq.${currentPlayerId}`)
-            .single()
+            .eq("player1_id", currentPlayerId)
+            .maybeSingle()
 
-          if (!error && teamData && teamData.table_number) {
+          const { data: teamData2 } = await supabase
+            .from("teams")
+            .select("table_number")
+            .eq("player2_id", currentPlayerId)
+            .maybeSingle()
+
+          const teamData = teamData1 || teamData2
+
+          if (teamData && teamData.table_number) {
             console.log("[v0] Player assigned to table via realtime:", teamData.table_number)
             setTableNumber(teamData.table_number)
             if (!gameStarted) {
@@ -140,13 +148,21 @@ export default function WaitingRoom() {
         if (payload.new && (payload.new as any).started) {
           setGameStarted(true)
           if (currentPlayerId) {
-            const { data: teamData, error } = await supabase
+            const { data: teamData1 } = await supabase
               .from("teams")
               .select("table_number")
-              .or(`player1_id.eq.${currentPlayerId},player2_id.eq.${currentPlayerId}`)
-              .single()
+              .eq("player1_id", currentPlayerId)
+              .maybeSingle()
 
-            if (!error && teamData && teamData.table_number) {
+            const { data: teamData2 } = await supabase
+              .from("teams")
+              .select("table_number")
+              .eq("player2_id", currentPlayerId)
+              .maybeSingle()
+
+            const teamData = teamData1 || teamData2
+
+            if (teamData && teamData.table_number) {
               console.log("[v0] Player assigned to table via game state change:", teamData.table_number)
               setTableNumber(teamData.table_number)
               alert('The game has started! Click "See Your Table" to join.')
@@ -215,16 +231,25 @@ export default function WaitingRoom() {
         }
 
         // Check teams table for table_number (more reliable)
-        const { data: teamData, error: teamError } = await supabase
+        // Use separate queries instead of .or() to avoid 406 errors
+        const { data: teamData1 } = await supabase
           .from("teams")
           .select("table_number, status")
-          .or(`player1_id.eq.${currentPlayerId},player2_id.eq.${currentPlayerId}`)
-          .single()
+          .eq("player1_id", currentPlayerId)
+          .maybeSingle()
 
-        if (teamError) {
-          // No team found yet, that's okay - but log it
+        const { data: teamData2 } = await supabase
+          .from("teams")
+          .select("table_number, status")
+          .eq("player2_id", currentPlayerId)
+          .maybeSingle()
+
+        const teamData = teamData1 || teamData2
+
+        if (!teamData) {
+          // No team found yet, that's okay - only log if game started
           if (gameStarted) {
-            console.log("[v0] ⚠️ Game started but no team found for player:", currentPlayerId, "Error:", teamError.message)
+            console.log("[v0] ⚠️ Game started but no team found for player:", currentPlayerId)
           }
           return
         }
@@ -264,7 +289,7 @@ export default function WaitingRoom() {
           
           // If game just started, check more aggressively
           if (!wasGameStarted) {
-            // Check immediately and then every second for the first 10 seconds
+            // Check immediately and then every 2 seconds for the first 20 seconds
             let checks = 0
             const aggressiveCheck = setInterval(async () => {
               checks++
@@ -272,7 +297,7 @@ export default function WaitingRoom() {
               if (checks >= 10 || tableNumber) {
                 clearInterval(aggressiveCheck)
               }
-            }, 1000)
+            }, 2000)
           }
         }
       } catch (error) {
@@ -280,13 +305,13 @@ export default function WaitingRoom() {
       }
     }
 
-    // Poll immediately, then every 1 second (more frequent)
+    // Poll immediately, then every 3 seconds (reduced frequency)
     pollGameState()
-    const pollInterval = setInterval(pollGameState, 1000)
+    const pollInterval = setInterval(pollGameState, 3000)
     
-    // Also check player assignment every 1 second (more frequent)
+    // Also check player assignment every 3 seconds (reduced frequency)
     checkPlayerTableAssignment()
-    const checkInterval = setInterval(checkPlayerTableAssignment, 1000)
+    const checkInterval = setInterval(checkPlayerTableAssignment, 3000)
 
     return () => {
       clearInterval(pollInterval)
@@ -314,9 +339,9 @@ export default function WaitingRoom() {
       }
     }
 
-    // Poll immediately, then every second
+    // Poll immediately, then every 3 seconds (reduced frequency)
     pollTimer()
-    const timerInterval = setInterval(pollTimer, 1000)
+    const timerInterval = setInterval(pollTimer, 3000)
 
     return () => clearInterval(timerInterval)
   }, [])

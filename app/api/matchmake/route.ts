@@ -119,24 +119,32 @@ export async function POST(req: Request) {
     const unpairedPartners: typeof players = []
 
     // Match partnered players by finding their partner
+    // Check both directions: player1.partner_name matches player2.name OR player2.partner_name matches player1.name
     for (const player of partneredPlayers) {
       if (matchedPartners.has(player.id)) continue
 
-      // Try to find their partner
       const partnerName = player.partner_name?.toLowerCase().trim()
-      if (!partnerName) continue
+      if (!partnerName) {
+        console.log(`[v0] ⚠️ Player ${player.name} has has_partner=true but no partner_name`)
+        unpairedPartners.push(player)
+        continue
+      }
 
       // Find a player whose name matches this player's partner_name
+      // OR whose partner_name matches this player's name (bidirectional matching)
       const partner = partneredPlayers.find(
         (p) =>
           p.id !== player.id &&
           !matchedPartners.has(p.id) &&
-          p.name.toLowerCase().trim() === partnerName,
+          (p.name.toLowerCase().trim() === partnerName ||
+           (p.partner_name && p.partner_name.toLowerCase().trim() === player.name.toLowerCase().trim()))
       )
 
       if (partner) {
         // Found the partner! Create team
         console.log(`[v0] ✅ Found partner match: ${player.name} ↔ ${partner.name}`)
+        console.log(`[v0]   Player 1 partner_name: ${player.partner_name}, Player 2 partner_name: ${partner.partner_name}`)
+        
         const { data: team, error: teamError } = await supabase
           .from("teams")
           .insert({
@@ -164,7 +172,10 @@ export async function POST(req: Request) {
         }
       } else {
         // Partner not found yet, add to unpaired list
-        console.log(`[v0] ⚠️ Partner not found for ${player.name} (looking for: ${partnerName})`)
+        console.log(`[v0] ⚠️ Partner not found for ${player.name} (looking for: "${partnerName}")`)
+        console.log(`[v0]   Available partnered players:`, partneredPlayers
+          .filter(p => p.id !== player.id && !matchedPartners.has(p.id))
+          .map(p => ({ name: p.name, partner_name: p.partner_name })))
         unpairedPartners.push(player)
       }
     }

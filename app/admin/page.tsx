@@ -484,20 +484,48 @@ export default function AdminPage() {
     }, 1500)
   }
 
-  const startTimer = () => {
-    setTimerActive(true)
-    console.log("[v0] Timer started - notifying all participants")
-
-    const interval = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval)
-          setTimerActive(false)
-          return 0
-        }
-        return prev - 1
+  const startTimer = async () => {
+    try {
+      // Start timer in database (5 minutes = 300 seconds)
+      const response = await fetch("/api/timer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ duration: 300 }), // 5 minutes
       })
-    }, 1000)
+
+      if (!response.ok) {
+        throw new Error("Failed to start timer")
+      }
+
+      setTimerActive(true)
+      setTimeRemaining(300) // 5 minutes
+      console.log("[v0] Timer started - notifying all participants")
+
+      // Poll timer state every second
+      const interval = setInterval(async () => {
+        const timerResponse = await fetch("/api/timer")
+        if (timerResponse.ok) {
+          const timerData = await timerResponse.json()
+          if (timerData.timer_active && timerData.time_remaining !== undefined) {
+            setTimeRemaining(timerData.time_remaining)
+            if (timerData.time_remaining <= 0) {
+              clearInterval(interval)
+              setTimerActive(false)
+            }
+          } else {
+            clearInterval(interval)
+            setTimerActive(false)
+            setTimeRemaining(0)
+          }
+        }
+      }, 1000)
+
+      // Store interval ID to clear it if needed
+      ;(window as any).timerInterval = interval
+    } catch (error) {
+      console.error("[v0] Error starting timer:", error)
+      alert("Failed to start timer. Please try again.")
+    }
   }
 
   const formatTime = (seconds: number) => {

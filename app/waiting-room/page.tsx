@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
-import { Settings } from "lucide-react"
+import { Settings, Clock } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 export default function WaitingRoom() {
@@ -15,6 +15,8 @@ export default function WaitingRoom() {
   const [tableNumber, setTableNumber] = useState<number | null>(null)
   const [currentSession, setCurrentSession] = useState<string>("Session 1")
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null)
+  const [timerActive, setTimerActive] = useState(false)
+  const [timeRemaining, setTimeRemaining] = useState(0)
   const maxSpots = 24 // 6 tables × 4 players per session
   const router = useRouter()
   const supabase = createClient()
@@ -267,6 +269,39 @@ export default function WaitingRoom() {
     }
   }, [gameStarted, currentPlayerId, supabase])
 
+  useEffect(() => {
+    // Poll timer state
+    const pollTimer = async () => {
+      try {
+        const response = await fetch("/api/timer")
+        if (response.ok) {
+          const data = await response.json()
+          if (data.timer_active && data.time_remaining !== undefined) {
+            setTimerActive(true)
+            setTimeRemaining(data.time_remaining)
+          } else {
+            setTimerActive(false)
+            setTimeRemaining(0)
+          }
+        }
+      } catch (error) {
+        console.error("[v0] Error polling timer:", error)
+      }
+    }
+
+    // Poll immediately, then every second
+    pollTimer()
+    const timerInterval = setInterval(pollTimer, 1000)
+
+    return () => clearInterval(timerInterval)
+  }, [])
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, "0")}`
+  }
+
   const progressPercentage = (spotsFilled / maxSpots) * 100
 
   const handleSeeTable = () => {
@@ -314,6 +349,16 @@ export default function WaitingRoom() {
           </div>
 
           <div className="p-8 space-y-6">
+            {timerActive && (
+              <div className="bg-[#1a1a2e] text-[#F2F7F7] rounded-xl p-6 border-2 border-[#1a1a2e]">
+                <div className="text-center space-y-2">
+                  <Clock className="w-8 h-8 mx-auto" />
+                  <p className="text-sm opacity-90">Game Starting In</p>
+                  <div className="text-4xl font-bold">{formatTime(timeRemaining)}</div>
+                </div>
+              </div>
+            )}
+
             <div className="bg-white rounded-xl p-6 border-2 border-[#1a1a2e]">
               <div className="text-center space-y-4">
                 <div className="text-6xl font-bold text-[#1a1a2e]">

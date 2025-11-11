@@ -260,11 +260,21 @@ export default function WaitingRoom() {
         console.log("[v0] Game table changed:", payload)
         if (payload.new && (payload.new as any).status === "finished" && currentPlayerId) {
           // Check if this table belongs to the current player
+          const changedTableId = (payload.new as any).id
           const changedTableNumber = (payload.new as any).table_number
-          if (changedTableNumber && tableNumber && changedTableNumber === tableNumber) {
-            console.log("[v0] 🏁 Round finished detected via realtime for table:", changedTableNumber)
+          
+          // Check if player's table_id matches
+          const { data: playerData } = await supabase
+            .from("players")
+            .select("table_id")
+            .eq("id", currentPlayerId)
+            .maybeSingle()
+          
+          if (playerData && playerData.table_id === changedTableId) {
+            console.log("[v0] 🏁 Round finished detected via realtime for player's table:", changedTableNumber)
             setRoundFinished(true)
             setShowGameStartedBanner(false)
+            setTableNumber(changedTableNumber)
           }
         }
       })

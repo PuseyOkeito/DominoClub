@@ -260,7 +260,7 @@ export default function WaitingRoom() {
           setTableNumber(teamData.table_number)
           if (!gameStarted) {
             setGameStarted(true)
-            alert('The game has started! Click "See Your Table" to join.')
+            setShowGameStartedBanner(true)
           }
         } else if (teamData && !teamData.table_number && gameStarted) {
           console.log("[v0] ⚠️ Team found but no table_number assigned yet. Team status:", teamData.status)

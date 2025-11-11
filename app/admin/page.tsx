@@ -344,18 +344,24 @@ export default function AdminPage() {
       })
 
       let data
-      try {
-        data = await response.json()
-      } catch (jsonError) {
-        console.error("[v0] Failed to parse response as JSON:", jsonError)
+      const contentType = response.headers.get("content-type")
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          data = await response.json()
+        } catch (jsonError) {
+          console.error("[v0] Failed to parse response as JSON:", jsonError)
+          alert(`Failed to create session: Invalid response from server`)
+          return
+        }
+      } else {
         const text = await response.text()
-        console.error("[v0] Response text:", text)
-        alert(`Failed to create session: Invalid response from server`)
+        console.error("[v0] Non-JSON response:", text)
+        alert(`Failed to create session: ${response.status} ${response.statusText}`)
         return
       }
 
       if (!response.ok) {
-        const errorMessage = data.error || `HTTP ${response.status}: ${response.statusText}`
+        const errorMessage = data?.error || `HTTP ${response.status}: ${response.statusText}`
         console.error("[v0] Error creating session:", errorMessage, data)
         alert(`Failed to create session: ${errorMessage}`)
         return

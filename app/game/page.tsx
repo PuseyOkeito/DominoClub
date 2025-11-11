@@ -30,6 +30,9 @@ function GameContent() {
         return
       }
 
+      // Mark that user has viewed their table
+      localStorage.setItem(`table-viewed-${currentPlayerId}`, "true")
+
       try {
         // Get player data
         const { data: playerData, error: playerError } = await supabase

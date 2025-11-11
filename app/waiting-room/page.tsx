@@ -133,9 +133,14 @@ export default function WaitingRoom() {
           if (teamData && teamData.table_number) {
             console.log("[v0] Player assigned to table via realtime:", teamData.table_number)
             setTableNumber(teamData.table_number)
-            if (!gameStarted) {
+            
+            // Check if user has already viewed their table - don't show banner if they have
+            const hasViewedTable = localStorage.getItem(`table-viewed-${currentPlayerId}`)
+            if (!gameStarted && hasViewedTable !== "true") {
               setGameStarted(true)
               setShowGameStartedBanner(true)
+            } else {
+              setGameStarted(true)
             }
           }
         }
@@ -148,7 +153,13 @@ export default function WaitingRoom() {
         console.log("[v0] Game state changed:", payload)
         if (payload.new && (payload.new as any).started) {
           setGameStarted(true)
-          setShowGameStartedBanner(true)
+          
+          // Check if user has already viewed their table - don't show banner if they have
+          const hasViewedTable = currentPlayerId ? localStorage.getItem(`table-viewed-${currentPlayerId}`) : null
+          if (hasViewedTable !== "true") {
+            setShowGameStartedBanner(true)
+          }
+          
           if (currentPlayerId) {
             const { data: teamData1 } = await supabase
               .from("teams")
@@ -223,9 +234,17 @@ export default function WaitingRoom() {
           if (!tableError && tableData && tableData.table_number) {
             console.log("[v0] ✅ Player has table_id, found table number:", tableData.table_number)
             setTableNumber(tableData.table_number)
-            if (!gameStarted) {
+            
+            // Check if user has already viewed their table - don't show banner if they have
+            const hasViewedTable = localStorage.getItem(`table-viewed-${currentPlayerId}`)
+            if (!gameStarted && hasViewedTable !== "true") {
               setGameStarted(true)
               setShowGameStartedBanner(true)
+            } else if (gameStarted && hasViewedTable === "true") {
+              // User has viewed table, don't show banner
+              setGameStarted(true)
+            } else {
+              setGameStarted(true)
             }
             return
           }
@@ -258,9 +277,17 @@ export default function WaitingRoom() {
         if (teamData && teamData.table_number) {
           console.log("[v0] ✅ Player assigned to table via teams table:", teamData.table_number, "Team status:", teamData.status)
           setTableNumber(teamData.table_number)
-          if (!gameStarted) {
+          
+          // Check if user has already viewed their table - don't show banner if they have
+          const hasViewedTable = localStorage.getItem(`table-viewed-${currentPlayerId}`)
+          if (!gameStarted && hasViewedTable !== "true") {
             setGameStarted(true)
             setShowGameStartedBanner(true)
+          } else if (gameStarted && hasViewedTable === "true") {
+            // User has viewed table, don't show banner
+            setGameStarted(true)
+          } else {
+            setGameStarted(true)
           }
         } else if (teamData && !teamData.table_number && gameStarted) {
           console.log("[v0] ⚠️ Team found but no table_number assigned yet. Team status:", teamData.status)
@@ -283,7 +310,12 @@ export default function WaitingRoom() {
           if (!wasGameStarted) {
             console.log("[v0] 🎮 Game started! Checking player assignment...")
             setGameStarted(true)
-            setShowGameStartedBanner(true)
+            
+            // Check if user has already viewed their table - don't show banner if they have
+            const hasViewedTable = currentPlayerId ? localStorage.getItem(`table-viewed-${currentPlayerId}`) : null
+            if (hasViewedTable !== "true") {
+              setShowGameStartedBanner(true)
+            }
           }
           
           // Always check player assignment when game is started
@@ -365,7 +397,9 @@ export default function WaitingRoom() {
       buttonDisabled: !gameStarted || !tableNumber 
     })
     
-    if (tableNumber) {
+    if (tableNumber && currentPlayerId) {
+      // Mark that user has viewed their table
+      localStorage.setItem(`table-viewed-${currentPlayerId}`, "true")
       console.log("[v0] ✅ Navigating to game with table number:", tableNumber)
       router.push(`/game?entry=${tableNumber}`)
     } else {

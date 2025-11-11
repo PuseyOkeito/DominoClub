@@ -2,20 +2,67 @@
 import { CheckInForm } from "@/components/checkin-form"
 import { Settings } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
 
 export default function Home() {
   const router = useRouter()
+  const [isChecking, setIsChecking] = useState(true)
 
   useEffect(() => {
-    // Check if player has already signed up
-    const currentPlayerId = localStorage.getItem("current-player-id")
-    if (currentPlayerId) {
-      // Player already exists, redirect to waiting room
-      console.log("[v0] Player already signed up, redirecting to waiting room")
-      router.push("/waiting-room")
+    const checkExistingPlayer = async () => {
+      const currentPlayerId = localStorage.getItem("current-player-id")
+      if (!currentPlayerId) {
+        setIsChecking(false)
+        return
+      }
+
+      // Verify player exists in database before redirecting
+      try {
+        const supabase = createClient()
+        const { data: playerData, error } = await supabase
+          .from("players")
+          .select("id")
+          .eq("id", currentPlayerId)
+          .single()
+
+        if (!error && playerData) {
+          // Player exists, redirect to waiting room
+          console.log("[v0] Player exists, redirecting to waiting room")
+          router.push("/waiting-room")
+        } else {
+          // Player doesn't exist in database, clear localStorage
+          console.log("[v0] Player not found in database, clearing localStorage")
+          localStorage.removeItem("current-player-id")
+          localStorage.removeItem("session-players")
+          setIsChecking(false)
+        }
+      } catch (error) {
+        console.error("[v0] Error checking player:", error)
+        setIsChecking(false)
+      }
     }
+
+    checkExistingPlayer()
   }, [router])
+
+  // Show loading state while checking
+  if (isChecking) {
+    return (
+      <main
+        className="relative min-h-screen flex items-center justify-center p-4"
+        style={{
+          backgroundImage: "url('/frame-19.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+        }}
+      >
+        <div className="absolute inset-0 bg-black/20" />
+        <div className="relative z-10 text-[#F2F7F7] text-xl">Loading...</div>
+      </main>
+    )
+  }
 
   return (
     <main

@@ -171,10 +171,15 @@ export default function WaitingRoom() {
 
     const checkPlayerTableAssignment = async () => {
       try {
+        if (!currentPlayerId) {
+          console.log("[v0] No currentPlayerId for table check")
+          return
+        }
+
         // First check player status and table_id directly
         const { data: playerData, error: playerError } = await supabase
           .from("players")
-          .select("id, status, table_id")
+          .select("id, status, table_id, session_id")
           .eq("id", currentPlayerId)
           .single()
 
@@ -186,7 +191,8 @@ export default function WaitingRoom() {
         console.log("[v0] Player data:", { 
           id: playerData?.id, 
           status: playerData?.status, 
-          table_id: playerData?.table_id 
+          table_id: playerData?.table_id,
+          session_id: playerData?.session_id
         })
 
         // If player has table_id, get the table number from game_tables
@@ -198,7 +204,7 @@ export default function WaitingRoom() {
             .single()
 
           if (!tableError && tableData && tableData.table_number) {
-            console.log("[v0] Player has table_id, found table number:", tableData.table_number)
+            console.log("[v0] ✅ Player has table_id, found table number:", tableData.table_number)
             setTableNumber(tableData.table_number)
             if (!gameStarted) {
               setGameStarted(true)
@@ -208,25 +214,30 @@ export default function WaitingRoom() {
           }
         }
 
-        // Fallback: Check teams table for table_number
+        // Check teams table for table_number (more reliable)
         const { data: teamData, error: teamError } = await supabase
           .from("teams")
-          .select("table_number")
+          .select("table_number, status")
           .or(`player1_id.eq.${currentPlayerId},player2_id.eq.${currentPlayerId}`)
           .single()
 
         if (teamError) {
-          // No team found yet, that's okay
+          // No team found yet, that's okay - but log it
+          if (gameStarted) {
+            console.log("[v0] ⚠️ Game started but no team found for player:", currentPlayerId, "Error:", teamError.message)
+          }
           return
         }
 
         if (teamData && teamData.table_number) {
-          console.log("[v0] Player assigned to table via teams table:", teamData.table_number)
+          console.log("[v0] ✅ Player assigned to table via teams table:", teamData.table_number, "Team status:", teamData.status)
           setTableNumber(teamData.table_number)
           if (!gameStarted) {
             setGameStarted(true)
             alert('The game has started! Click "See Your Table" to join.')
           }
+        } else if (teamData && !teamData.table_number && gameStarted) {
+          console.log("[v0] ⚠️ Team found but no table_number assigned yet. Team status:", teamData.status)
         }
       } catch (error) {
         console.error("[v0] Failed to check player assignment:", error)
@@ -242,26 +253,40 @@ export default function WaitingRoom() {
         console.log("[v0] Game state poll:", data)
 
         if (data.started) {
-          if (!gameStarted) {
-            console.log("[v0] Game started! Checking player assignment...")
+          const wasGameStarted = gameStarted
+          if (!wasGameStarted) {
+            console.log("[v0] 🎮 Game started! Checking player assignment...")
             setGameStarted(true)
           }
           
           // Always check player assignment when game is started
           await checkPlayerTableAssignment()
+          
+          // If game just started, check more aggressively
+          if (!wasGameStarted) {
+            // Check immediately and then every second for the first 10 seconds
+            let checks = 0
+            const aggressiveCheck = setInterval(async () => {
+              checks++
+              await checkPlayerTableAssignment()
+              if (checks >= 10 || tableNumber) {
+                clearInterval(aggressiveCheck)
+              }
+            }, 1000)
+          }
         }
       } catch (error) {
         console.error("[v0] Failed to poll game state:", error)
       }
     }
 
-    // Poll immediately, then every 2 seconds
+    // Poll immediately, then every 1 second (more frequent)
     pollGameState()
-    const pollInterval = setInterval(pollGameState, 2000)
+    const pollInterval = setInterval(pollGameState, 1000)
     
-    // Also check player assignment every 2 seconds
+    // Also check player assignment every 1 second (more frequent)
     checkPlayerTableAssignment()
-    const checkInterval = setInterval(checkPlayerTableAssignment, 2000)
+    const checkInterval = setInterval(checkPlayerTableAssignment, 1000)
 
     return () => {
       clearInterval(pollInterval)

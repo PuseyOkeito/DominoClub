@@ -1,143 +1,147 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import Image from "next/image"
-import { loadMatchmakingResults, reportGameResult, type Team, type Table } from "@/lib/matchmaking"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card } from "@/components/ui/card"
+import { createClient } from "@/lib/supabase/client"
+import { CheckCircle2, X } from "lucide-react"
 
-export default function GameResultPage() {
-  const [myTeam, setMyTeam] = useState<Team | null>(null)
-  const [opponentTeam, setOpponentTeam] = useState<Team | null>(null)
-  const [table, setTable] = useState<Table | null>(null)
-  const [selectedWinner, setSelectedWinner] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [resultSubmitted, setResultSubmitted] = useState(false)
-  const router = useRouter()
+function GameResultContent() {
   const searchParams = useSearchParams()
-  const tableId = searchParams.get("table")
+  const router = useRouter()
+  const tableNumber = searchParams.get("table")
+  const [team1, setTeam1] = useState<{ id: string; name: string } | null>(null)
+  const [team2, setTeam2] = useState<{ id: string; name: string } | null>(null)
+  const [winningTeamId, setWinningTeamId] = useState<string | null>(null)
+  const [team1Score, setTeam1Score] = useState<string>("")
+  const [team2Score, setTeam2Score] = useState<string>("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const supabase = createClient()
 
   useEffect(() => {
-    if (!tableId) {
-      router.push("/waiting-room")
+    const loadTableData = async () => {
+      if (!tableNumber) {
+        setError("No table number provided")
+        return
+      }
+
+      try {
+        // Get table data
+        const { data: tableData, error: tableError } = await supabase
+          .from("game_tables")
+          .select("team1_id, team2_id")
+          .eq("table_number", parseInt(tableNumber))
+          .single()
+
+        if (tableError || !tableData) {
+          setError("Table not found")
+          return
+        }
+
+        // Get team 1 data
+        if (tableData.team1_id) {
+          const { data: team1Data } = await supabase
+            .from("teams")
+            .select("id, player1_name, player2_name")
+            .eq("id", tableData.team1_id)
+            .single()
+
+          if (team1Data) {
+            setTeam1({
+              id: team1Data.id,
+              name: `${team1Data.player1_name} & ${team1Data.player2_name}`,
+            })
+          }
+        }
+
+        // Get team 2 data
+        if (tableData.team2_id) {
+          const { data: team2Data } = await supabase
+            .from("teams")
+            .select("id, player1_name, player2_name")
+            .eq("id", tableData.team2_id)
+            .single()
+
+          if (team2Data) {
+            setTeam2({
+              id: team2Data.id,
+              name: `${team2Data.player1_name} & ${team2Data.player2_name}`,
+            })
+          }
+        }
+      } catch (err) {
+        console.error("[v0] Error loading table data:", err)
+        setError("Failed to load table data")
+      }
+    }
+
+    loadTableData()
+  }, [tableNumber, supabase])
+
+  const handleSubmit = async () => {
+    if (!winningTeamId) {
+      setError("Please select the winning team")
       return
     }
 
-    const { players, teams, tables } = loadMatchmakingResults()
-    const currentTable = tables.find((t) => t.id === tableId)
-
-    if (!currentTable) {
-      router.push("/waiting-room")
+    if (!team1Score || !team2Score) {
+      setError("Please enter scores for both teams")
       return
     }
 
-    const team1 = teams.find((t) => t.id === currentTable.team1Id)
-    const team2 = teams.find((t) => t.id === currentTable.team2Id)
+    const score1 = parseInt(team1Score)
+    const score2 = parseInt(team2Score)
 
-    setTable(currentTable)
-    setMyTeam(team1 || null)
-    setOpponentTeam(team2 || null)
-
-    // Check if result already submitted
-    if (currentTable.status === "finished") {
-      setResultSubmitted(true)
+    if (isNaN(score1) || isNaN(score2) || score1 < 0 || score2 < 0) {
+      setError("Scores must be valid numbers")
+      return
     }
-  }, [tableId, router])
-
-  const handleSubmitResult = () => {
-    if (!selectedWinner || !table) return
 
     setIsSubmitting(true)
+    setError(null)
 
-    // Report the game result
-    reportGameResult(table.id, selectedWinner)
+    try {
+      const losingTeamId = winningTeamId === team1?.id ? team2?.id : team1?.id
 
-    setTimeout(() => {
+      // Update winning team
+      if (winningTeamId) {
+        const { error: winError } = await supabase
+          .from("teams")
+          .update({
+            wins: supabase.raw("wins + 1"),
+          })
+          .eq("id", winningTeamId)
+
+        if (winError) {
+          throw winError
+        }
+      }
+
+      // Update losing team
+      if (losingTeamId) {
+        const { error: lossError } = await supabase
+          .from("teams")
+          .update({
+            losses: supabase.raw("losses + 1"),
+          })
+          .eq("id", losingTeamId)
+
+        if (lossError) {
+          throw lossError
+        }
+      }
+
+      // Redirect back to game page
+      router.push(`/game?entry=${tableNumber}`)
+    } catch (err) {
+      console.error("[v0] Error submitting result:", err)
+      setError("Failed to submit result. Please try again.")
       setIsSubmitting(false)
-      setResultSubmitted(true)
-
-      // Redirect to next round or waiting room
-      setTimeout(() => {
-        router.push("/waiting-room")
-      }, 2000)
-    }, 1000)
-  }
-
-  if (!myTeam || !opponentTeam || !table) {
-    return (
-      <main
-        className="relative min-h-screen flex items-center justify-center p-4"
-        style={{
-          backgroundImage: "url('/frame-19.jpg')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-        }}
-      >
-        <div className="absolute inset-0 bg-black/20" />
-        <div className="relative z-10 text-[#F2F7F7] text-xl">Loading...</div>
-      </main>
-    )
-  }
-
-  if (resultSubmitted) {
-    const winningTeam = table.winnerId === myTeam.id ? myTeam : opponentTeam
-    const losingTeam = table.winnerId === myTeam.id ? opponentTeam : myTeam
-
-    return (
-      <main
-        className="relative min-h-screen flex items-center justify-center p-4"
-        style={{
-          backgroundImage: "url('/frame-19.jpg')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-        }}
-      >
-        <div className="absolute inset-0 bg-black/20" />
-
-        <div className="relative z-10 w-full max-w-md">
-          <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-24 h-24 rounded-full bg-[#1a1a2e] border-8 border-[#F2F7F7] flex items-center justify-center shadow-lg z-10 overflow-hidden">
-            <Image src="/logo.png" alt="Domino Social" width={96} height={96} className="w-full h-full object-cover" />
-          </div>
-
-          <div
-            className="bg-[#F2F7F7] rounded-2xl border-4 border-[#1a1a2e] p-8 pt-16 shadow-2xl relative overflow-hidden"
-            style={{
-              backgroundImage:
-                "repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(26, 26, 46, 0.03) 2px, rgba(26, 26, 46, 0.03) 4px)",
-            }}
-          >
-            <div className="space-y-6 relative z-10">
-              <div className="text-center space-y-2">
-                <h2 className="text-3xl font-bold text-[#1a1a2e]">Game Complete!</h2>
-                <p className="text-[#6b7280] text-sm">Results have been recorded</p>
-              </div>
-
-              <div className="bg-white rounded-xl p-6 border-2 border-[#1a1a2e] space-y-4">
-                <div className="text-center">
-                  <div className="text-sm text-[#6b7280] mb-2">Winners</div>
-                  <div className="text-2xl font-bold text-[#1a1a2e]">
-                    {winningTeam.player1Name} & {winningTeam.player2Name}
-                  </div>
-                </div>
-
-                <div className="border-t-2 border-[#e0e8e8] pt-4">
-                  <div className="text-sm text-[#6b7280] mb-2">Runners Up</div>
-                  <div className="text-xl font-medium text-[#1a1a2e]">
-                    {losingTeam.player1Name} & {losingTeam.player2Name}
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-[#1a1a2e] text-[#F2F7F7] p-4 rounded-xl text-center">
-                <p className="text-sm">Redirecting to waiting room for next round...</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-    )
+    }
   }
 
   return (
@@ -150,83 +154,125 @@ export default function GameResultPage() {
         backgroundRepeat: "no-repeat",
       }}
     >
-      <div className="absolute inset-0 bg-black/20" />
+      <div className="absolute inset-0 bg-black/20 pointer-events-none" />
 
-      <div className="relative z-10 w-full max-w-md">
-        <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-24 h-24 rounded-full bg-[#1a1a2e] border-8 border-[#F2F7F7] flex items-center justify-center shadow-lg z-10 overflow-hidden">
-          <Image src="/logo.png" alt="Domino Social" width={96} height={96} className="w-full h-full object-cover" />
-        </div>
-
-        <div
-          className="bg-[#F2F7F7] rounded-2xl border-4 border-[#1a1a2e] p-8 pt-16 shadow-2xl relative overflow-hidden"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(26, 26, 46, 0.03) 2px, rgba(26, 26, 46, 0.03) 4px)",
-          }}
-        >
-          <div className="space-y-6 relative z-10">
-            <div className="text-center space-y-2">
-              <h2 className="text-3xl font-bold text-[#1a1a2e]">Report Result</h2>
-              <p className="text-[#6b7280] text-sm">Table {table.number}</p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="text-sm text-[#6b7280] text-center mb-4">Select the winning team</div>
-
-              {/* Team 1 */}
-              <button
-                onClick={() => setSelectedWinner(myTeam.id)}
-                className={`w-full p-6 rounded-xl border-2 transition-all ${
-                  selectedWinner === myTeam.id
-                    ? "bg-[#1a1a2e] border-[#1a1a2e] text-[#F2F7F7]"
-                    : "bg-white border-[#1a1a2e] text-[#1a1a2e] hover:bg-[#e0e8e8]"
-                }`}
-              >
-                <div className="text-center space-y-2">
-                  <div className="text-lg font-bold">
-                    {myTeam.player1Name} & {myTeam.player2Name}
-                  </div>
-                  <div className="text-sm opacity-75">Team 1</div>
-                </div>
-              </button>
-
-              {/* Team 2 */}
-              <button
-                onClick={() => setSelectedWinner(opponentTeam.id)}
-                className={`w-full p-6 rounded-xl border-2 transition-all ${
-                  selectedWinner === opponentTeam.id
-                    ? "bg-[#1a1a2e] border-[#1a1a2e] text-[#F2F7F7]"
-                    : "bg-white border-[#1a1a2e] text-[#1a1a2e] hover:bg-[#e0e8e8]"
-                }`}
-              >
-                <div className="text-center space-y-2">
-                  <div className="text-lg font-bold">
-                    {opponentTeam.player1Name} & {opponentTeam.player2Name}
-                  </div>
-                  <div className="text-sm opacity-75">Team 2</div>
-                </div>
-              </button>
-            </div>
-
-            <Button
-              size="lg"
-              disabled={!selectedWinner || isSubmitting}
-              className="w-full h-14 text-base font-medium bg-[#1a1a2e] hover:bg-[#2a2a3e] text-[#F2F7F7] rounded-2xl border-2 border-[#1a1a2e] shadow-md disabled:opacity-50"
-              onClick={handleSubmitResult}
-            >
-              {isSubmitting ? "Submitting..." : "• Submit Result •"}
-            </Button>
-
-            <Button
-              variant="outline"
-              className="w-full h-12 bg-[#F2F7F7] hover:bg-[#e0e8e8] text-[#1a1a2e] rounded-2xl border-2 border-[#1a1a2e] font-medium"
-              onClick={() => router.push("/game")}
-            >
-              Cancel
-            </Button>
+      <Card className="relative z-10 w-full max-w-md p-8 bg-[#F2F7F7] border-4 border-[#1a1a2e] shadow-2xl">
+        <div className="space-y-6">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-[#1a1a2e] mb-2">Report Game Result</h1>
+            {tableNumber && (
+              <p className="text-lg text-[#6b7280]">Table {tableNumber}</p>
+            )}
           </div>
+
+          {error && (
+            <div className="bg-red-100 border-2 border-red-500 text-red-700 p-4 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
+          {team1 && team2 ? (
+            <>
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-[#1a1a2e] font-semibold mb-2 block">Select Winning Team</Label>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setWinningTeamId(team1.id)}
+                      className={`w-full p-4 rounded-xl border-2 transition-all ${
+                        winningTeamId === team1.id
+                          ? "bg-green-100 border-green-500 text-green-900"
+                          : "bg-white border-[#1a1a2e] text-[#1a1a2e] hover:bg-[#e0e8e8]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{team1.name}</span>
+                        {winningTeamId === team1.id && <CheckCircle2 className="w-5 h-5" />}
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => setWinningTeamId(team2.id)}
+                      className={`w-full p-4 rounded-xl border-2 transition-all ${
+                        winningTeamId === team2.id
+                          ? "bg-green-100 border-green-500 text-green-900"
+                          : "bg-white border-[#1a1a2e] text-[#1a1a2e] hover:bg-[#e0e8e8]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{team2.name}</span>
+                        {winningTeamId === team2.id && <CheckCircle2 className="w-5 h-5" />}
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="team1-score" className="text-[#1a1a2e] font-semibold mb-2 block">
+                      {team1.name} Score
+                    </Label>
+                    <Input
+                      id="team1-score"
+                      type="number"
+                      min="0"
+                      value={team1Score}
+                      onChange={(e) => setTeam1Score(e.target.value)}
+                      className="h-12 text-lg text-center border-2 border-[#1a1a2e]"
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="team2-score" className="text-[#1a1a2e] font-semibold mb-2 block">
+                      {team2.name} Score
+                    </Label>
+                    <Input
+                      id="team2-score"
+                      type="number"
+                      min="0"
+                      value={team2Score}
+                      onChange={(e) => setTeam2Score(e.target.value)}
+                      className="h-12 text-lg text-center border-2 border-[#1a1a2e]"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 h-12 bg-white hover:bg-[#e0e8e8] text-[#1a1a2e] border-2 border-[#1a1a2e]"
+                  onClick={() => router.back()}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 h-12 bg-[#1a1a2e] hover:bg-[#2a2a3e] text-[#F2F7F7] border-2 border-[#1a1a2e]"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Submitting..." : "Submit Result"}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-[#6b7280]">Loading table data...</p>
+            </div>
+          )}
         </div>
-      </div>
+      </Card>
     </main>
+  )
+}
+
+export default function GameResultPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#8B1C1F]" />}>
+      <GameResultContent />
+    </Suspense>
   )
 }

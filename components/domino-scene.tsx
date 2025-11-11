@@ -10,10 +10,22 @@ interface DominoProps {
   position: [number, number, number]
   rotation: [number, number, number]
   opacity: number
+  onRef?: (ref: RapierRigidBody | null) => void
 }
 
-function DominoBox({ position, rotation, opacity }: DominoProps) {
+function DominoBox({ position, rotation, opacity, onRef }: DominoProps) {
   const rigidBodyRef = useRef<RapierRigidBody>(null)
+
+  useEffect(() => {
+    if (onRef && rigidBodyRef.current) {
+      onRef(rigidBodyRef.current)
+    }
+    return () => {
+      if (onRef) {
+        onRef(null)
+      }
+    }
+  }, [onRef])
 
   return (
     <RigidBody
@@ -122,112 +134,76 @@ function DominoBox({ position, rotation, opacity }: DominoProps) {
   )
 }
 
-function DominoSpawner({ onShake, shakeDetected }: { onShake: () => void; shakeDetected: boolean }) {
+function DominoSpawner() {
   const [dominoes, setDominoes] = useState<
     Array<{ id: number; position: [number, number, number]; rotation: [number, number, number]; opacity: number }>
   >([])
   const dominoIdCounter = useRef(0)
   const lastSpawnTime = useRef(0)
   const rigidBodiesRef = useRef<Array<RapierRigidBody | null>>([])
+  const accelerometerRef = useRef<{ x: number; y: number; z: number }>({ x: 0, y: 0, z: 0 })
 
+  // Use accelerometer for continuous effect
   useEffect(() => {
     if (typeof window !== "undefined" && "DeviceMotionEvent" in window) {
-      if (typeof (DeviceMotionEvent as any).requestPermission === "function") {
-        const button = document.createElement("button")
-        button.textContent = "Enable Shake Detection"
-        button.style.cssText = `
-          position: fixed;
-          bottom: 20px;
-          left: 50%;
-          transform: translateX(-50%);
-          z-index: 1000;
-          padding: 12px 24px;
-          background: #1a1a2e;
-          color: white;
-          border: none;
-          border-radius: 8px;
-          font-size: 16px;
-          cursor: pointer;
-        `
-        button.onclick = async () => {
+      let permissionGranted = false
+
+      const setupAccelerometer = async () => {
+        if (typeof (DeviceMotionEvent as any).requestPermission === "function") {
           try {
             const permission = await (DeviceMotionEvent as any).requestPermission()
             if (permission === "granted") {
-              button.remove()
-              setupShakeDetection()
+              permissionGranted = true
+              startAccelerometer()
             }
           } catch (error) {
-            console.error("Permission denied:", error)
+            console.error("Accelerometer permission denied:", error)
           }
-        }
-        document.body.appendChild(button)
-      } else {
-        setupShakeDetection()
-      }
-    }
-
-    function setupShakeDetection() {
-      let lastX = 0,
-        lastY = 0,
-        lastZ = 0
-      let lastTime = Date.now()
-
-      const handleMotion = (event: DeviceMotionEvent) => {
-        const acceleration = event.accelerationIncludingGravity
-        if (!acceleration) return
-
-        const currentTime = Date.now()
-        const timeDiff = currentTime - lastTime
-
-        if (timeDiff > 100) {
-          const x = acceleration.x || 0
-          const y = acceleration.y || 0
-          const z = acceleration.z || 0
-
-          const deltaX = Math.abs(x - lastX)
-          const deltaY = Math.abs(y - lastY)
-          const deltaZ = Math.abs(z - lastZ)
-
-          if (deltaX + deltaY + deltaZ > 30) {
-            onShake()
-          }
-
-          lastX = x
-          lastY = y
-          lastZ = z
-          lastTime = currentTime
+        } else {
+          permissionGranted = true
+          startAccelerometer()
         }
       }
 
-      window.addEventListener("devicemotion", handleMotion)
-      return () => window.removeEventListener("devicemotion", handleMotion)
-    }
-  }, [onShake])
+      const startAccelerometer = () => {
+        const handleMotion = (event: DeviceMotionEvent) => {
+          const acceleration = event.accelerationIncludingGravity
+          if (!acceleration) return
 
-  useEffect(() => {
-    if (shakeDetected) {
-      rigidBodiesRef.current.forEach((rb) => {
-        if (rb) {
-          rb.applyImpulse(
-            {
-              x: (Math.random() - 0.5) * 5,
-              y: Math.random() * 3,
-              z: (Math.random() - 0.5) * 5,
-            },
-            true,
-          )
-          rb.applyTorqueImpulse(
-            {
-              x: (Math.random() - 0.5) * 2,
-              y: (Math.random() - 0.5) * 2,
-              z: (Math.random() - 0.5) * 2,
-            },
-            true,
-          )
+          accelerometerRef.current = {
+            x: acceleration.x || 0,
+            y: acceleration.y || 0,
+            z: acceleration.z || 0,
+          }
         }
-      })
+
+        window.addEventListener("devicemotion", handleMotion)
+        return () => window.removeEventListener("devicemotion", handleMotion)
+      }
+
+      setupAccelerometer()
     }
-  }, [shakeDetected])
+  }, [])
+
+  // Apply accelerometer forces to dominoes continuously
+  useFrame(() => {
+    const accel = accelerometerRef.current
+    const forceMultiplier = 0.5 // Adjust sensitivity
+    
+    rigidBodiesRef.current.forEach((rb) => {
+      if (rb) {
+        // Apply continuous force based on accelerometer
+        rb.applyImpulse(
+          {
+            x: accel.x * forceMultiplier,
+            y: accel.y * forceMultiplier * 0.3, // Less vertical force
+            z: accel.z * forceMultiplier,
+          },
+          true,
+        )
+      }
+    })
+  })
 
   useFrame((state) => {
     const time = state.clock.getElapsedTime()
@@ -260,21 +236,22 @@ function DominoSpawner({ onShake, shakeDetected }: { onShake: () => void; shakeD
 
   return (
     <>
-      {dominoes.map((domino) => (
-        <DominoBox key={domino.id} position={domino.position} rotation={domino.rotation} opacity={domino.opacity} />
+      {dominoes.map((domino, index) => (
+        <DominoBox 
+          key={domino.id} 
+          position={domino.position} 
+          rotation={domino.rotation} 
+          opacity={domino.opacity}
+          onRef={(ref) => {
+            rigidBodiesRef.current[index] = ref
+          }}
+        />
       ))}
     </>
   )
 }
 
 export default function DominoScene() {
-  const [shakeDetected, setShakeDetected] = useState(false)
-
-  const handleShake = () => {
-    setShakeDetected(true)
-    setTimeout(() => setShakeDetected(false), 100)
-  }
-
   return (
     <div className="fixed inset-0">
       <Canvas shadows camera={{ position: [0, 5, 15], fov: 50 }} gl={{ alpha: false, antialias: true }}>
@@ -317,7 +294,7 @@ export default function DominoScene() {
             </mesh>
           </RigidBody>
 
-          <DominoSpawner onShake={handleShake} shakeDetected={shakeDetected} />
+          <DominoSpawner />
         </Physics>
       </Canvas>
     </div>

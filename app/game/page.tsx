@@ -16,6 +16,8 @@ function GameContent() {
   const [tableNumber, setTableNumber] = useState<number | null>(null)
   const [partnerName, setPartnerName] = useState<string | null>(null)
   const [playerName, setPlayerName] = useState<string | null>(null)
+  const [opposingTeam, setOpposingTeam] = useState<string | null>(null)
+  const [currentTeamId, setCurrentTeamId] = useState<string | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -45,37 +47,89 @@ function GameContent() {
           setPlayerName(playerData.name)
           setPartnerName(playerData.partner_name || null)
 
-          // Get table number from game_tables
+          // Get table data to find teams
           if (playerData.table_id) {
             const { data: tableData, error: tableError } = await supabase
               .from("game_tables")
-              .select("table_number")
+              .select("table_number, team1_id, team2_id")
               .eq("id", playerData.table_id)
               .single()
 
             if (!tableError && tableData) {
               setTableNumber(tableData.table_number)
+              
+              // Find which team the current player belongs to
+              const { data: playerTeam1 } = await supabase
+                .from("teams")
+                .select("id, player1_id, player2_id")
+                .eq("player1_id", currentPlayerId)
+                .maybeSingle()
+
+              const { data: playerTeam2 } = await supabase
+                .from("teams")
+                .select("id, player1_id, player2_id")
+                .eq("player2_id", currentPlayerId)
+                .maybeSingle()
+
+              const playerTeam = playerTeam1 || playerTeam2
+
+              if (playerTeam) {
+                setCurrentTeamId(playerTeam.id)
+                
+                // Find the opposing team
+                const opposingTeamId = tableData.team1_id === playerTeam.id 
+                  ? tableData.team2_id 
+                  : tableData.team1_id
+
+                if (opposingTeamId) {
+                  const { data: opposingTeamData } = await supabase
+                    .from("teams")
+                    .select("player1_name, player2_name")
+                    .eq("id", opposingTeamId)
+                    .single()
+
+                  if (opposingTeamData) {
+                    setOpposingTeam(`${opposingTeamData.player1_name} & ${opposingTeamData.player2_name}`)
+                  }
+                }
+              }
             } else {
               // Fallback: check teams table
-              const { data: teamData, error: teamError } = await supabase
+              const { data: teamData1 } = await supabase
                 .from("teams")
                 .select("table_number")
-                .or(`player1_id.eq.${currentPlayerId},player2_id.eq.${currentPlayerId}`)
-                .single()
+                .eq("player1_id", currentPlayerId)
+                .maybeSingle()
 
-              if (!teamError && teamData && teamData.table_number) {
+              const { data: teamData2 } = await supabase
+                .from("teams")
+                .select("table_number")
+                .eq("player2_id", currentPlayerId)
+                .maybeSingle()
+
+              const teamData = teamData1 || teamData2
+
+              if (teamData && teamData.table_number) {
                 setTableNumber(teamData.table_number)
               }
             }
           } else {
             // No table_id, check teams table
-            const { data: teamData, error: teamError } = await supabase
+            const { data: teamData1 } = await supabase
               .from("teams")
               .select("table_number")
-              .or(`player1_id.eq.${currentPlayerId},player2_id.eq.${currentPlayerId}`)
-              .single()
+              .eq("player1_id", currentPlayerId)
+              .maybeSingle()
 
-            if (!teamError && teamData && teamData.table_number) {
+            const { data: teamData2 } = await supabase
+              .from("teams")
+              .select("table_number")
+              .eq("player2_id", currentPlayerId)
+              .maybeSingle()
+
+            const teamData = teamData1 || teamData2
+
+            if (teamData && teamData.table_number) {
               setTableNumber(teamData.table_number)
             }
           }
@@ -109,6 +163,11 @@ function GameContent() {
           {partnerName && (
             <div className="text-4xl font-semibold text-white/30 mt-4">
               Partner: {partnerName}
+            </div>
+          )}
+          {opposingTeam && (
+            <div className="text-3xl font-semibold text-white/25 mt-4">
+              vs. {opposingTeam}
             </div>
           )}
           {entryNumber && (

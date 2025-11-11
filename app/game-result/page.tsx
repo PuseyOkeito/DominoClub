@@ -171,7 +171,7 @@ function GameResultContent() {
     localStorage.removeItem("session-players")
     
     // Redirect to home page for new signup
-    router.push("/?new=true")
+    router.push("/")
   }
 
   return (

@@ -5,6 +5,40 @@ export async function POST() {
   try {
     const supabase = await createClient()
 
+    // First, clear all players who are still "waiting" (not assigned to tables)
+    // This ensures the waiting room is fresh for new signups
+    const { data: waitingPlayers, error: waitingPlayersError } = await supabase
+      .from("players")
+      .select("id")
+      .eq("status", "waiting")
+      .is("table_id", null)
+
+    if (!waitingPlayersError && waitingPlayers && waitingPlayers.length > 0) {
+      const waitingPlayerIds = waitingPlayers.map((p) => p.id)
+      console.log(`[v0] Clearing ${waitingPlayerIds.length} waiting players before starting new game`)
+
+      // Delete waiting players
+      const { error: deleteError } = await supabase
+        .from("players")
+        .delete()
+        .in("id", waitingPlayerIds)
+
+      if (deleteError) {
+        console.error("[v0] Error clearing waiting players:", deleteError)
+        // Continue anyway - don't fail the game start
+      } else {
+        console.log(`[v0] ✅ Cleared ${waitingPlayerIds.length} waiting players`)
+      }
+    }
+
+    // Reset game state to start fresh
+    // First reset to false, then set to true to trigger fresh state
+    await supabase
+      .from("game_state")
+      .update({ started: false, updated_at: new Date().toISOString() })
+      .eq("id", "current")
+
+    // Now set started to true
     const { error } = await supabase
       .from("game_state")
       .update({ started: true, updated_at: new Date().toISOString() })

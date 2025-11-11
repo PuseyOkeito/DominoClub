@@ -387,6 +387,31 @@ export default function WaitingRoom() {
               }
             }, 2000)
           }
+        } else {
+          // Game was reset - clear waiting room state for new game
+          if (gameStarted) {
+            console.log("[v0] 🔄 Game reset detected - clearing waiting room state")
+            setGameStarted(false)
+            setShowGameStartedBanner(false)
+            setTableNumber(null)
+            // Reload players to show fresh waiting room
+            const reloadPlayers = async () => {
+              const { data, error } = await supabase.from("players").select("*").order("created_at", { ascending: true })
+              if (!error && data) {
+                setPlayers(data)
+                const session1Players = data.filter((p: any) => p.session_id === "session-1")
+                const session2Players = data.filter((p: any) => p.session_id === "session-2")
+                if (session2Players.length > 0) {
+                  setCurrentSession("Session 2")
+                  setSpotsFilled(session2Players.length)
+                } else {
+                  setCurrentSession("Session 1")
+                  setSpotsFilled(session1Players.length)
+                }
+              }
+            }
+            reloadPlayers()
+          }
         }
       } catch (error) {
         console.error("[v0] Failed to poll game state:", error)
@@ -473,30 +498,6 @@ export default function WaitingRoom() {
     >
       <div className="absolute inset-0 bg-black/20 pointer-events-none" />
 
-      {/* Game Started Banner - More Prominent */}
-      {showGameStartedBanner && (
-        <div className="fixed top-0 left-0 right-0 z-[100] px-4 pt-4 pb-2">
-          <div className="max-w-md mx-auto">
-            <div className="bg-green-600 text-white rounded-xl p-5 border-4 border-green-500 shadow-2xl flex items-center justify-between gap-4 animate-in slide-in-from-top-5 duration-300">
-              <div className="flex items-center gap-3 flex-1">
-                <CheckCircle2 className="w-7 h-7 flex-shrink-0" />
-                <div>
-                  <p className="font-bold text-base">🎮 Game Started!</p>
-                  <p className="text-sm opacity-95 mt-0.5">Click "See Your Table" below to join</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowGameStartedBanner(false)}
-                className="flex-shrink-0 hover:bg-green-700 rounded-full p-1.5 transition-colors"
-                aria-label="Dismiss notification"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <button
         onClick={() => router.push("/admin")}
         className="absolute top-6 right-6 z-20 w-12 h-12 rounded-full bg-[#1a1a2e] border-2 border-[#F2F7F7] flex items-center justify-center hover:bg-[#2a2a3e] transition-colors shadow-lg"
@@ -531,6 +532,26 @@ export default function WaitingRoom() {
                   <p className="text-sm opacity-90">Game Starting In</p>
                   <div className="text-4xl font-bold">{formatTime(timeRemaining)}</div>
                 </div>
+              </div>
+            )}
+
+            {/* Game Started Banner - Above spots filled */}
+            {showGameStartedBanner && (
+              <div className="bg-green-600 text-white rounded-xl p-3 border-2 border-green-500 shadow-lg flex items-center justify-between gap-3 animate-in slide-in-from-top-5 duration-300">
+                <div className="flex items-center gap-2 flex-1">
+                  <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                  <div>
+                    <p className="font-bold text-sm">🎮 Game Started!</p>
+                    <p className="text-xs opacity-95 mt-0.5">Click "See Your Table" below to join</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowGameStartedBanner(false)}
+                  className="flex-shrink-0 hover:bg-green-700 rounded-full p-1 transition-colors"
+                  aria-label="Dismiss notification"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             )}
 

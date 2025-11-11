@@ -343,11 +343,21 @@ export default function AdminPage() {
         }),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        throw new Error("Failed to create session")
+        const errorMessage = data.error || "Failed to create session"
+        console.error("[v0] Error creating session:", errorMessage)
+        alert(`Failed to create session: ${errorMessage}`)
+        return
       }
 
-      const data = await response.json()
+      if (!data.session) {
+        console.error("[v0] Invalid response format:", data)
+        alert("Failed to create session: Invalid response format")
+        return
+      }
+
       const newSession: Session = {
         id: data.session.id,
         name: data.session.name,
@@ -362,7 +372,8 @@ export default function AdminPage() {
       setShowAddSession(false)
     } catch (error) {
       console.error("[v0] Error creating session:", error)
-      alert("Failed to create session. Please try again.")
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      alert(`Failed to create session: ${errorMessage}`)
     }
   }
 

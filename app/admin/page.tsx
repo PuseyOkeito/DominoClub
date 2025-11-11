@@ -103,6 +103,7 @@ export default function AdminPage() {
           return
         }
         const data = await response.json()
+        console.log("[v0] Initial sessions load:", data)
         if (data.sessions && data.sessions.length > 0) {
           const formattedSessions: Session[] = data.sessions.map((s: any) => ({
             id: s.id,
@@ -111,6 +112,7 @@ export default function AdminPage() {
             maxPlayers: s.max_players,
             players: [],
           }))
+          console.log("[v0] Setting initial sessions:", formattedSessions)
           setSessions(formattedSessions)
           
           // Auto-select first session
@@ -119,11 +121,16 @@ export default function AdminPage() {
             setSelectedSessionId(formattedSessions[0].id)
           }
         } else {
+          console.log("[v0] No sessions in database, creating default")
           // If no sessions exist, create default one
           const defaultSessions: Session[] = [
             { id: "session-1", name: "Evening Session 1", startTime: "6:00 PM", maxPlayers: 24, players: [] },
           ]
           setSessions(defaultSessions)
+          // Ensure session-1 is selected
+          if (!selectedSessionId || selectedSessionId !== "session-1") {
+            setSelectedSessionId("session-1")
+          }
         }
       } catch (error) {
         console.error("[v0] Error loading sessions:", error)
@@ -225,6 +232,7 @@ export default function AdminPage() {
       const sessionsResponse = await fetch("/api/sessions")
       if (sessionsResponse.ok) {
         const sessionsData = await sessionsResponse.json()
+        console.log("[v0] Sessions API response:", sessionsData)
         if (sessionsData.sessions && sessionsData.sessions.length > 0) {
           const formattedSessions: Session[] = sessionsData.sessions.map((s: any) => ({
             id: s.id,
@@ -233,8 +241,28 @@ export default function AdminPage() {
             maxPlayers: s.max_players,
             players: [],
           }))
+          console.log("[v0] Formatted sessions:", formattedSessions)
           setSessions(formattedSessions)
+          
+          // Ensure a session is selected
+          if (!selectedSessionId && formattedSessions.length > 0) {
+            setSelectedSessionId(formattedSessions[0].id)
+          }
+        } else {
+          console.warn("[v0] No sessions found in API response")
+          // If no sessions exist, ensure default session is set
+          if (sessions.length === 0) {
+            const defaultSessions: Session[] = [
+              { id: "session-1", name: "Evening Session 1", startTime: "6:00 PM", maxPlayers: 24, players: [] },
+            ]
+            setSessions(defaultSessions)
+            if (!selectedSessionId) {
+              setSelectedSessionId("session-1")
+            }
+          }
         }
+      } else {
+        console.error("[v0] Failed to fetch sessions:", sessionsResponse.status)
       }
     }
 
@@ -816,7 +844,13 @@ export default function AdminPage() {
             )}
 
             <div className="grid gap-3">
-              {sessions.map((session) => {
+              {sessions.length === 0 ? (
+                <div className="p-4 rounded-xl border-2 border-[#1a1a2e] bg-[#F2F7F7] text-center">
+                  <p className="text-[#6b7280] mb-2">No sessions found.</p>
+                  <p className="text-xs text-[#6b7280]">Check browser console for errors or try refreshing.</p>
+                </div>
+              ) : (
+                sessions.map((session) => {
                 const sessionPlayers = players.filter((p: any) => p.session_id === session.id)
                 const isEditing = editingSessionId === session.id
                 return (

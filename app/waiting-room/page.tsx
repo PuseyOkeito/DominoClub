@@ -225,7 +225,7 @@ export default function WaitingRoom() {
             setTableNumber(tableData.table_number)
             if (!gameStarted) {
               setGameStarted(true)
-              alert('The game has started! Click "See Your Table" to join.')
+              setShowGameStartedBanner(true)
             }
             return
           }

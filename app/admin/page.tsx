@@ -851,74 +851,75 @@ export default function AdminPage() {
                 </div>
               ) : (
                 sessions.map((session) => {
-                const sessionPlayers = players.filter((p: any) => p.session_id === session.id)
-                const isEditing = editingSessionId === session.id
-                return (
-                  <div
-                    key={session.id}
-                    className={`p-4 rounded-xl border-2 border-[#1a1a2e] ${
-                      selectedSessionId === session.id
-                        ? "bg-[#1a1a2e] text-[#F2F7F7]"
-                        : "bg-[#F2F7F7] text-[#1a1a2e]"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <Button
-                        variant="ghost"
-                        className={`flex-1 h-auto p-0 justify-start text-left ${
-                          selectedSessionId === session.id
-                            ? "text-[#F2F7F7] hover:bg-[#2a2a3e]"
-                            : "text-[#1a1a2e] hover:bg-[#e0e8e8]"
-                        }`}
-                        onClick={() => setSelectedSessionId(session.id)}
-                      >
-                        <div className="flex-1">
-                          <div className="font-semibold">{session.name}</div>
-                          <div className="text-sm opacity-80">
-                            {isEditing ? (
-                              <div className="flex items-center gap-2 mt-2">
-                                <Input
-                                  type="time"
-                                  value={editStartTime}
-                                  onChange={(e) => setEditStartTime(e.target.value)}
-                                  className={`h-8 w-32 ${
-                                    selectedSessionId === session.id
-                                      ? "bg-[#2a2a3e] text-[#F2F7F7] border-[#F2F7F7]"
-                                      : "bg-white text-[#1a1a2e] border-[#1a1a2e]"
-                                  }`}
-                                />
-                                <Button
-                                  size="sm"
-                                  className={`h-8 ${
-                                    selectedSessionId === session.id
-                                      ? "bg-[#F2F7F7] text-[#1a1a2e] hover:bg-[#e0e8e8]"
-                                      : "bg-[#1a1a2e] text-[#F2F7F7] hover:bg-[#2a2a3e]"
-                                  }`}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleUpdateStartTime(session.id)
-                                  }}
-                                >
-                                  Save
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setEditingSessionId(null)
-                                    setEditStartTime("")
-                                  }}
-                                >
-                                  Cancel
-                                </Button>
-                              </div>
-                            ) : (
-                              <>
-                                Start: {session.startTime} • {sessionPlayers.length}/{session.maxPlayers} players
-                              </>
-                            )}
+                  const sessionPlayers = players.filter((p: any) => p.session_id === session.id)
+                  const isEditing = editingSessionId === session.id
+                  return (
+                    <div
+                      key={session.id}
+                      className={`p-4 rounded-xl border-2 border-[#1a1a2e] ${
+                        selectedSessionId === session.id
+                          ? "bg-[#1a1a2e] text-[#F2F7F7]"
+                          : "bg-[#F2F7F7] text-[#1a1a2e]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <Button
+                          variant="ghost"
+                          className={`flex-1 h-auto p-0 justify-start text-left ${
+                            selectedSessionId === session.id
+                              ? "text-[#F2F7F7] hover:bg-[#2a2a3e]"
+                              : "text-[#1a1a2e] hover:bg-[#e0e8e8]"
+                          }`}
+                          onClick={() => setSelectedSessionId(session.id)}
+                        >
+                          <div className="flex-1">
+                            <div className="font-semibold">{session.name}</div>
+                            <div className="text-sm opacity-80">
+                              {isEditing ? (
+                                <div className="flex items-center gap-2 mt-2">
+                                  <Input
+                                    type="time"
+                                    value={editStartTime}
+                                    onChange={(e) => setEditStartTime(e.target.value)}
+                                    className={`h-8 w-32 ${
+                                      selectedSessionId === session.id
+                                        ? "bg-[#2a2a3e] text-[#F2F7F7] border-[#F2F7F7]"
+                                        : "bg-white text-[#1a1a2e] border-[#1a1a2e]"
+                                    }`}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    className={`h-8 ${
+                                      selectedSessionId === session.id
+                                        ? "bg-[#F2F7F7] text-[#1a1a2e] hover:bg-[#e0e8e8]"
+                                        : "bg-[#1a1a2e] text-[#F2F7F7] hover:bg-[#2a2a3e]"
+                                    }`}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleUpdateStartTime(session.id)
+                                    }}
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setEditingSessionId(null)
+                                      setEditStartTime("")
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              ) : (
+                                <>
+                                  Start: {session.startTime} • {sessionPlayers.length}/{session.maxPlayers} players
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </Button>

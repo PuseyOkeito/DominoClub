@@ -433,27 +433,6 @@ export default function WaitingRoom() {
               </div>
             )}
 
-            <div className="bg-white rounded-xl p-4 border-2 border-[#1a1a2e] max-h-64 overflow-y-auto">
-              <h3 className="text-sm font-medium text-[#1a1a2e] mb-3">Players Joined</h3>
-              <div className="space-y-2">
-                {players.length === 0 ? (
-                  <p className="text-sm text-[#6b7280] text-center py-4">No players yet...</p>
-                ) : (
-                  players.map((player) => (
-                    <div
-                      key={player.id}
-                      className="flex items-center justify-between p-2 bg-[#F2F7F7] rounded-lg border border-[#e0e8e8]"
-                    >
-                      <span className="text-sm font-medium text-[#1a1a2e]">{player.name}</span>
-                      {player.has_partner && (
-                        <span className="text-xs bg-[#1a1a2e] text-[#F2F7F7] px-2 py-1 rounded-full">Partnered</span>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
             <div className="space-y-3">
               <Button
                 size="lg"

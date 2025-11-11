@@ -473,24 +473,26 @@ export default function WaitingRoom() {
     >
       <div className="absolute inset-0 bg-black/20 pointer-events-none" />
 
-      {/* Game Started Banner */}
+      {/* Game Started Banner - More Prominent */}
       {showGameStartedBanner && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4">
-          <div className="bg-green-600 text-white rounded-xl p-4 border-2 border-green-700 shadow-lg flex items-center justify-between gap-4 animate-in slide-in-from-top-5 duration-300">
-            <div className="flex items-center gap-3 flex-1">
-              <CheckCircle2 className="w-6 h-6 flex-shrink-0" />
-              <div>
-                <p className="font-semibold text-sm">Game Started!</p>
-                <p className="text-xs opacity-90">Click "See Your Table" below to join</p>
+        <div className="fixed top-0 left-0 right-0 z-[100] px-4 pt-4 pb-2">
+          <div className="max-w-md mx-auto">
+            <div className="bg-green-600 text-white rounded-xl p-5 border-4 border-green-500 shadow-2xl flex items-center justify-between gap-4 animate-in slide-in-from-top-5 duration-300">
+              <div className="flex items-center gap-3 flex-1">
+                <CheckCircle2 className="w-7 h-7 flex-shrink-0" />
+                <div>
+                  <p className="font-bold text-base">🎮 Game Started!</p>
+                  <p className="text-sm opacity-95 mt-0.5">Click "See Your Table" below to join</p>
+                </div>
               </div>
+              <button
+                onClick={() => setShowGameStartedBanner(false)}
+                className="flex-shrink-0 hover:bg-green-700 rounded-full p-1.5 transition-colors"
+                aria-label="Dismiss notification"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <button
-              onClick={() => setShowGameStartedBanner(false)}
-              className="flex-shrink-0 hover:bg-green-700 rounded-full p-1 transition-colors"
-              aria-label="Dismiss notification"
-            >
-              <X className="w-5 h-5" />
-            </button>
           </div>
         </div>
       )}

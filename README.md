@@ -33,3 +33,4 @@ Deployed on Vercel with automatic deployments from GitHub.
 - Reset session functionality
 - Better error handling and logging
 
+# Build trigger

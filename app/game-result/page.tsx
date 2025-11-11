@@ -109,29 +109,43 @@ function GameResultContent() {
 
       // Update winning team
       if (winningTeamId) {
-        const { error: winError } = await supabase
+        // Get current wins
+        const { data: winTeamData } = await supabase
           .from("teams")
-          .update({
-            wins: supabase.raw("wins + 1"),
-          })
+          .select("wins")
           .eq("id", winningTeamId)
+          .single()
 
-        if (winError) {
-          throw winError
+        if (winTeamData) {
+          const { error: winError } = await supabase
+            .from("teams")
+            .update({ wins: (winTeamData.wins || 0) + 1 })
+            .eq("id", winningTeamId)
+
+          if (winError) {
+            throw winError
+          }
         }
       }
 
       // Update losing team
       if (losingTeamId) {
-        const { error: lossError } = await supabase
+        // Get current losses
+        const { data: lossTeamData } = await supabase
           .from("teams")
-          .update({
-            losses: supabase.raw("losses + 1"),
-          })
+          .select("losses")
           .eq("id", losingTeamId)
+          .single()
 
-        if (lossError) {
-          throw lossError
+        if (lossTeamData) {
+          const { error: lossError } = await supabase
+            .from("teams")
+            .update({ losses: (lossTeamData.losses || 0) + 1 })
+            .eq("id", losingTeamId)
+
+          if (lossError) {
+            throw lossError
+          }
         }
       }
 

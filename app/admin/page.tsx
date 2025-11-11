@@ -433,8 +433,21 @@ export default function AdminPage() {
     }
     
     const sessionPlayers = players.filter((p: any) => p.session_id === selectedSessionId)
-    if (sessionPlayers.length < 4) {
-      alert("Need at least 4 players to start matchmaking")
+    
+    // Calculate potential teams: partnered players form teams, solo players pair up
+    const partneredCount = sessionPlayers.filter((p: any) => p.has_partner && p.partner_name).length
+    const soloCount = sessionPlayers.filter((p: any) => !p.has_partner).length
+    
+    // Each partnered pair = 1 team, every 2 solo players = 1 team
+    const potentialTeams = Math.floor(partneredCount / 2) + Math.floor(soloCount / 2)
+    
+    if (sessionPlayers.length < 2) {
+      alert("Need at least 2 players to start matchmaking")
+      return
+    }
+    
+    if (potentialTeams < 2) {
+      alert(`Need at least 2 teams to create a table. Currently: ${potentialTeams} potential team(s) from ${sessionPlayers.length} players.\n\nPartnered players: ${partneredCount}\nSolo players: ${soloCount}`)
       return
     }
 
@@ -983,19 +996,31 @@ export default function AdminPage() {
                     >
                       • Start Next Round ({waitlistTeams.length} teams) •
                     </Button>
-                  ) : sessionPlayers.length >= 4 ? (
-                    <Button
-                      size="lg"
-                      className="w-full h-14 bg-[#1a1a2e] hover:bg-[#2a2a3e] text-[#F2F7F7] rounded-xl border-2 border-[#1a1a2e]"
-                      onClick={handleStartMatchmaking}
-                    >
-                      • Start Matchmaking ({sessionPlayers.length} players) •
-                    </Button>
-                  ) : (
-                    <div className="bg-[#e0e8e8] text-[#6b7280] p-4 rounded-xl text-center">
-                      <p className="text-sm">Waiting for at least 4 players to start...</p>
-                    </div>
-                  )}
+                  ) : (() => {
+                    // Calculate potential teams
+                    const partneredCount = sessionPlayers.filter((p: any) => p.has_partner && p.partner_name).length
+                    const soloCount = sessionPlayers.filter((p: any) => !p.has_partner).length
+                    const potentialTeams = Math.floor(partneredCount / 2) + Math.floor(soloCount / 2)
+                    
+                    if (potentialTeams >= 2) {
+                      return (
+                        <Button
+                          size="lg"
+                          className="w-full h-14 bg-[#1a1a2e] hover:bg-[#2a2a3e] text-[#F2F7F7] rounded-xl border-2 border-[#1a1a2e]"
+                          onClick={handleStartMatchmaking}
+                        >
+                          • Start Matchmaking ({potentialTeams} teams, {sessionPlayers.length} players) •
+                        </Button>
+                      )
+                    } else {
+                      return (
+                        <div className="bg-[#e0e8e8] text-[#6b7280] p-4 rounded-xl text-center">
+                          <p className="text-sm">Need at least 2 teams to start (currently {potentialTeams} team{potentialTeams !== 1 ? 's' : ''})</p>
+                          <p className="text-xs mt-1">{sessionPlayers.length} players: {partneredCount} partnered, {soloCount} solo</p>
+                        </div>
+                      )
+                    }
+                  })()}
                 </div>
 
                 <div className="space-y-4">

@@ -85,10 +85,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Failed to fetch players" }, { status: 500 })
     }
 
-    if (!players || players.length < 4) {
+    if (!players || players.length < 2) {
       return NextResponse.json(
         {
-          error: "Not enough players (need at least 4)",
+          error: "Not enough players (need at least 2)",
           playerCount: players?.length || 0,
         },
         { status: 400 },
@@ -230,8 +230,19 @@ export async function POST(req: Request) {
       )
     }
     
+    // Need at least 2 teams to create a table (2 teams = 4 players = 1 table)
     if (teams.length < 2) {
       console.warn(`[v0] ⚠️ Only ${teams.length} team(s) created - need at least 2 teams to create a table`)
+      return NextResponse.json(
+        {
+          error: `Need at least 2 teams to create a table. Only ${teams.length} team(s) created from ${players.length} players.`,
+          teamsCreated: teams.length,
+          playerCount: players.length,
+          partneredCount: partneredPlayers.length,
+          soloCount: soloPlayers.length,
+        },
+        { status: 400 },
+      )
     }
 
     // ===== Create game tables (2 teams = 4 players per table) =====

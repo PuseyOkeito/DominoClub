@@ -211,6 +211,8 @@ export async function POST(req: Request) {
     const remainingTeams = teams.slice(maxTablesToCreate * 2)
 
     console.log(`[v0] Creating ${maxTablesToCreate} tables from ${teams.length} teams (max ${MAX_TABLES_PER_SESSION})`)
+    console.log(`[v0] Teams to assign:`, teamsToAssign.map(t => ({ id: t.id, player1: t.player1_name, player2: t.player2_name })))
+    console.log(`[v0] Remaining teams:`, remainingTeams.length)
 
     // Get next available table number for this session
     const { data: existingTables } = await supabase
@@ -278,19 +280,32 @@ export async function POST(req: Request) {
 
         // Update players status to assigned AND set table_id
         const playerIds = [team1.player1_id, team1.player2_id, team2.player1_id, team2.player2_id]
-        const { error: playersUpdateError } = await supabase
+        console.log(`[v0] Updating players for table ${tableNumber}:`, playerIds)
+        console.log(`[v0] Game table ID:`, gameTable.id)
+        
+        const { data: updatedPlayers, error: playersUpdateError } = await supabase
           .from("players")
           .update({ 
             status: "assigned",
             table_id: gameTable.id  // Set the table_id to the game_table UUID
           })
           .in("id", playerIds)
+          .select("id, name, status, table_id")
 
         if (playersUpdateError) {
-          console.error("[v0] Error updating players:", playersUpdateError)
+          console.error("[v0] ❌ Error updating players:", playersUpdateError)
+          console.error("[v0] Error details:", {
+            message: playersUpdateError.message,
+            code: playersUpdateError.code,
+            details: playersUpdateError.details,
+            hint: playersUpdateError.hint
+          })
           console.error("[v0] Player IDs attempted:", playerIds)
         } else {
-          console.log(`[v0] Updated ${playerIds.length} players to assigned status with table_id: ${gameTable.id}`)
+          console.log(`[v0] ✅ Successfully updated ${updatedPlayers?.length || 0} players:`)
+          updatedPlayers?.forEach(p => {
+            console.log(`[v0]   - ${p.name}: status=${p.status}, table_id=${p.table_id}`)
+          })
         }
       }
     }

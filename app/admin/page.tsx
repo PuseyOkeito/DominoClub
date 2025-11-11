@@ -453,14 +453,47 @@ export default function AdminPage() {
 
       const result = await response.json()
       console.log("[v0] Matchmaking result:", result)
+      console.log("[v0] Matchmaking details:", {
+        teamsCreated: result.teamsCreated,
+        tablesCreated: result.tablesCreated,
+        waitlistTeams: result.waitlistTeams,
+        unpairedPlayers: result.unpairedPlayers
+      })
+
+      if (!result.success) {
+        throw new Error(result.error || "Matchmaking failed")
+      }
 
       // Start the game
-      await fetch("/api/start-game", {
+      const startGameResponse = await fetch("/api/start-game", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       })
 
-      alert(`Matchmaking complete! ${result.teamsCreated} teams created.`)
+      if (!startGameResponse.ok) {
+        console.error("[v0] Failed to start game:", await startGameResponse.json())
+      } else {
+        console.log("[v0] ✅ Game started successfully")
+      }
+
+      // Reload players to see updated statuses
+      const supabaseClient = createClient()
+      const { data: updatedPlayers } = await supabaseClient
+        .from("players")
+        .select("*")
+        .eq("session_id", selectedSessionId)
+        .order("created_at", { ascending: true })
+      
+      if (updatedPlayers) {
+        console.log("[v0] Players after matchmaking:", updatedPlayers.map(p => ({
+          name: p.name,
+          status: p.status,
+          table_id: p.table_id
+        })))
+        setPlayers(updatedPlayers)
+      }
+
+      alert(`Matchmaking complete! ${result.teamsCreated} teams created, ${result.tablesCreated} tables assigned.`)
     } catch (error) {
       console.error("[v0] Error during matchmaking:", error)
       alert("Failed to start matchmaking. Please try again.")

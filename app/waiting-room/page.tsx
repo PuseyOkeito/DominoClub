@@ -330,8 +330,19 @@ export default function WaitingRoom() {
   const progressPercentage = (spotsFilled / maxSpots) * 100
 
   const handleSeeTable = () => {
+    console.log("[v0] 🔘 Button clicked! handleSeeTable called")
+    console.log("[v0] Current state:", { 
+      gameStarted, 
+      tableNumber, 
+      currentPlayerId,
+      buttonDisabled: !gameStarted || !tableNumber 
+    })
+    
     if (tableNumber) {
+      console.log("[v0] ✅ Navigating to game with table number:", tableNumber)
       router.push(`/game?entry=${tableNumber}`)
+    } else {
+      console.log("[v0] ❌ Cannot navigate - tableNumber is null/undefined")
     }
   }
 
@@ -345,7 +356,7 @@ export default function WaitingRoom() {
         backgroundRepeat: "no-repeat",
       }}
     >
-      <div className="absolute inset-0 bg-black/20" />
+      <div className="absolute inset-0 bg-black/20 pointer-events-none" />
 
       <button
         onClick={() => router.push("/admin")}
@@ -447,11 +458,17 @@ export default function WaitingRoom() {
               <Button
                 size="lg"
                 disabled={!gameStarted || !tableNumber}
-                className="w-full h-14 text-base font-medium bg-[#1a1a2e] hover:bg-[#2a2a3e] text-[#F2F7F7] rounded-2xl border-2 border-[#1a1a2e] shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full h-14 text-base font-medium bg-[#1a1a2e] hover:bg-[#2a2a3e] text-[#F2F7F7] rounded-2xl border-2 border-[#1a1a2e] shadow-md disabled:opacity-50 disabled:cursor-not-allowed relative z-50"
                 onClick={handleSeeTable}
               >
                 • See Your Table •
               </Button>
+              {/* Debug info */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="text-xs text-gray-500 p-2 bg-gray-100 rounded">
+                  Debug: gameStarted={gameStarted ? 'true' : 'false'}, tableNumber={tableNumber || 'null'}
+                </div>
+              )}
 
               <Button
                 variant="outline"

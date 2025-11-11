@@ -20,6 +20,12 @@ export default function AssignmentPage() {
 
   useEffect(() => {
     const { players, teams, tables } = loadMatchmakingResults()
+    
+    console.log("[v0] Assignment page - matchmaking results:", { 
+      players: players.length, 
+      teams: teams.length, 
+      tables: tables.length 
+    })
 
     if (players.length > 0 && teams.length > 0 && tables.length > 0) {
       // Get the current user's player ID from localStorage
@@ -56,8 +62,14 @@ export default function AssignmentPage() {
   }, [])
 
   const handleViewTable = () => {
+    console.log("[v0] 🔘 Assignment page - Button clicked! handleViewTable called")
+    console.log("[v0] Assignment data:", assignment)
+    
     if (assignment) {
+      console.log("[v0] ✅ Navigating to game with entry number:", assignment.entryNumber)
       router.push(`/game?entry=${assignment.entryNumber}`)
+    } else {
+      console.log("[v0] ❌ Cannot navigate - assignment is null")
     }
   }
 
@@ -78,7 +90,7 @@ export default function AssignmentPage() {
           backgroundRepeat: "no-repeat",
         }}
       >
-        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute inset-0 bg-black/20 pointer-events-none" />
         <div className="relative z-10 text-[#F2F7F7] text-xl">Loading assignment...</div>
       </main>
     )
@@ -94,7 +106,7 @@ export default function AssignmentPage() {
         backgroundRepeat: "no-repeat",
       }}
     >
-      <div className="absolute inset-0 bg-black/20" />
+      <div className="absolute inset-0 bg-black/20 pointer-events-none" />
 
       <div className="relative z-10 w-full max-w-md">
         <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-24 h-24 rounded-full bg-[#1a1a2e] border-8 border-[#F2F7F7] flex items-center justify-center shadow-lg z-10 overflow-hidden">
@@ -139,7 +151,7 @@ export default function AssignmentPage() {
             <div className="space-y-3">
               <Button
                 size="lg"
-                className="w-full h-14 text-base font-medium bg-[#1a1a2e] hover:bg-[#2a2a3e] text-[#F2F7F7] rounded-2xl border-2 border-[#1a1a2e] shadow-md"
+                className="w-full h-14 text-base font-medium bg-[#1a1a2e] hover:bg-[#2a2a3e] text-[#F2F7F7] rounded-2xl border-2 border-[#1a1a2e] shadow-md relative z-50"
                 onClick={handleViewTable}
               >
                 • See your table •

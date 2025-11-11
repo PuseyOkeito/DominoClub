@@ -23,6 +23,60 @@ export default function WaitingRoom() {
   const supabase = createClient()
 
   useEffect(() => {
+    // Check if user has already viewed their table - if so, redirect them
+    const checkIfTableViewed = async () => {
+      const currentPlayerId = localStorage.getItem("current-player-id")
+      if (!currentPlayerId) return
+
+      const hasViewedTable = localStorage.getItem(`table-viewed-${currentPlayerId}`)
+      if (hasViewedTable === "true") {
+        // Check if they still have a table assigned
+        const { data: playerData } = await supabase
+          .from("players")
+          .select("table_id")
+          .eq("id", currentPlayerId)
+          .single()
+
+        if (playerData?.table_id) {
+          // Get table number and redirect
+          const { data: tableData } = await supabase
+            .from("game_tables")
+            .select("table_number")
+            .eq("id", playerData.table_id)
+            .single()
+
+          if (tableData?.table_number) {
+            console.log("[v0] User has already viewed table, redirecting to game page")
+            router.push(`/game?entry=${tableData.table_number}`)
+            return
+          }
+        }
+
+        // Also check teams table as fallback
+        const { data: teamData1 } = await supabase
+          .from("teams")
+          .select("table_number")
+          .eq("player1_id", currentPlayerId)
+          .maybeSingle()
+
+        const { data: teamData2 } = await supabase
+          .from("teams")
+          .select("table_number")
+          .eq("player2_id", currentPlayerId)
+          .maybeSingle()
+
+        const teamData = teamData1 || teamData2
+        if (teamData?.table_number) {
+          console.log("[v0] User has already viewed table, redirecting to game page")
+          router.push(`/game?entry=${teamData.table_number}`)
+        }
+      }
+    }
+
+    checkIfTableViewed()
+  }, [router, supabase])
+
+  useEffect(() => {
     // Get current player ID - check localStorage first, then database
     const loadCurrentPlayer = async () => {
       // First check localStorage (set when player joins)

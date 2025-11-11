@@ -18,6 +18,7 @@ export default function WaitingRoom() {
   const [timerActive, setTimerActive] = useState(false)
   const [timeRemaining, setTimeRemaining] = useState(0)
   const [showGameStartedBanner, setShowGameStartedBanner] = useState(false)
+  const [roundFinished, setRoundFinished] = useState(false)
   const maxSpots = 24 // 6 tables × 4 players per session
   const router = useRouter()
   const supabase = createClient()
@@ -292,17 +293,25 @@ export default function WaitingRoom() {
           session_id: playerData?.session_id
         })
 
-        // If player has table_id, get the table number from game_tables
+        // If player has table_id, get the table number and status from game_tables
         if (playerData && playerData.table_id) {
           const { data: tableData, error: tableError } = await supabase
             .from("game_tables")
-            .select("table_number")
+            .select("table_number, status")
             .eq("id", playerData.table_id)
             .single()
 
           if (!tableError && tableData && tableData.table_number) {
-            console.log("[v0] ✅ Player has table_id, found table number:", tableData.table_number)
+            console.log("[v0] ✅ Player has table_id, found table number:", tableData.table_number, "Status:", tableData.status)
             setTableNumber(tableData.table_number)
+            
+            // Check if table is finished
+            if (tableData.status === "finished") {
+              console.log("[v0] 🏁 Round finished for player")
+              setRoundFinished(true)
+              setShowGameStartedBanner(false)
+              return
+            }
             
             // Check if user has already viewed their table - don't show banner if they have
             const hasViewedTable = localStorage.getItem(`table-viewed-${currentPlayerId}`)
@@ -346,6 +355,22 @@ export default function WaitingRoom() {
         if (teamData && teamData.table_number) {
           console.log("[v0] ✅ Player assigned to table via teams table:", teamData.table_number, "Team status:", teamData.status)
           setTableNumber(teamData.table_number)
+          
+          // Check if table is finished
+          if (teamData.table_number) {
+            const { data: tableStatusData } = await supabase
+              .from("game_tables")
+              .select("status")
+              .eq("table_number", teamData.table_number)
+              .maybeSingle()
+            
+            if (tableStatusData && tableStatusData.status === "finished") {
+              console.log("[v0] 🏁 Round finished for player")
+              setRoundFinished(true)
+              setShowGameStartedBanner(false)
+              return
+            }
+          }
           
           // Check if user has already viewed their table - don't show banner if they have
           const hasViewedTable = localStorage.getItem(`table-viewed-${currentPlayerId}`)
@@ -521,6 +546,19 @@ export default function WaitingRoom() {
     }
   }
 
+  const handlePlayAgain = () => {
+    // Clear all localStorage data
+    const currentPlayerId = localStorage.getItem("current-player-id")
+    if (currentPlayerId) {
+      localStorage.removeItem(`table-viewed-${currentPlayerId}`)
+    }
+    localStorage.removeItem("current-player-id")
+    localStorage.removeItem("session-players")
+    
+    // Redirect to home page for new signup
+    router.push("/")
+  }
+
   return (
     <main
       className="relative min-h-screen flex items-center justify-center p-4"
@@ -570,8 +608,26 @@ export default function WaitingRoom() {
               </div>
             )}
 
+            {/* Round Finished Banner - Above spots filled */}
+            {roundFinished && (
+              <div className="bg-blue-600 text-white rounded-xl p-4 border-2 border-blue-500 shadow-lg text-center space-y-4 animate-in slide-in-from-top-5 duration-300">
+                <div className="space-y-2">
+                  <div className="text-4xl">🏁</div>
+                  <p className="font-bold text-base">Round Finished!</p>
+                  <p className="text-sm opacity-95">This round has been completed. You can join a new game!</p>
+                </div>
+                <Button
+                  size="lg"
+                  className="w-full h-12 bg-white hover:bg-blue-50 text-blue-600 rounded-xl border-2 border-white font-medium"
+                  onClick={handlePlayAgain}
+                >
+                  Play Again
+                </Button>
+              </div>
+            )}
+
             {/* Game Started Banner - Above spots filled */}
-            {showGameStartedBanner && (
+            {showGameStartedBanner && !roundFinished && (
               <div className="bg-green-600 text-white rounded-xl p-3 border-2 border-green-500 shadow-lg flex items-center justify-between gap-3 animate-in slide-in-from-top-5 duration-300">
                 <div className="flex items-center gap-2 flex-1">
                   <CheckCircle2 className="w-5 h-5 flex-shrink-0" />

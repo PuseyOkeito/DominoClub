@@ -152,6 +152,19 @@ function GameResultContent() {
         }
       }
 
+      // Mark the game table as finished
+      if (tableNumber) {
+        const { error: tableError } = await supabase
+          .from("game_tables")
+          .update({ status: "finished" })
+          .eq("table_number", parseInt(tableNumber))
+
+        if (tableError) {
+          console.error("[v0] Error updating table status:", tableError)
+          // Don't throw - result was recorded successfully
+        }
+      }
+
       // Redirect to thank you screen instead of game page
       setShowThankYou(true)
     } catch (err) {

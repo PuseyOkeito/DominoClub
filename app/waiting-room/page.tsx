@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
-import { Settings, Clock } from "lucide-react"
+import { Settings, Clock, X, CheckCircle2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 export default function WaitingRoom() {
@@ -17,6 +17,7 @@ export default function WaitingRoom() {
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null)
   const [timerActive, setTimerActive] = useState(false)
   const [timeRemaining, setTimeRemaining] = useState(0)
+  const [showGameStartedBanner, setShowGameStartedBanner] = useState(false)
   const maxSpots = 24 // 6 tables × 4 players per session
   const router = useRouter()
   const supabase = createClient()
@@ -134,7 +135,7 @@ export default function WaitingRoom() {
             setTableNumber(teamData.table_number)
             if (!gameStarted) {
               setGameStarted(true)
-              alert('The game has started! Click "See Your Table" to join.')
+              setShowGameStartedBanner(true)
             }
           }
         }
@@ -147,6 +148,7 @@ export default function WaitingRoom() {
         console.log("[v0] Game state changed:", payload)
         if (payload.new && (payload.new as any).started) {
           setGameStarted(true)
+          setShowGameStartedBanner(true)
           if (currentPlayerId) {
             const { data: teamData1 } = await supabase
               .from("teams")
@@ -165,7 +167,6 @@ export default function WaitingRoom() {
             if (teamData && teamData.table_number) {
               console.log("[v0] Player assigned to table via game state change:", teamData.table_number)
               setTableNumber(teamData.table_number)
-              alert('The game has started! Click "See Your Table" to join.')
             }
           }
         }
@@ -282,6 +283,7 @@ export default function WaitingRoom() {
           if (!wasGameStarted) {
             console.log("[v0] 🎮 Game started! Checking player assignment...")
             setGameStarted(true)
+            setShowGameStartedBanner(true)
           }
           
           // Always check player assignment when game is started
@@ -382,6 +384,28 @@ export default function WaitingRoom() {
       }}
     >
       <div className="absolute inset-0 bg-black/20 pointer-events-none" />
+
+      {/* Game Started Banner */}
+      {showGameStartedBanner && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4">
+          <div className="bg-green-600 text-white rounded-xl p-4 border-2 border-green-700 shadow-lg flex items-center justify-between gap-4 animate-in slide-in-from-top-5 duration-300">
+            <div className="flex items-center gap-3 flex-1">
+              <CheckCircle2 className="w-6 h-6 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-sm">Game Started!</p>
+                <p className="text-xs opacity-90">Click "See Your Table" below to join</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowGameStartedBanner(false)}
+              className="flex-shrink-0 hover:bg-green-700 rounded-full p-1 transition-colors"
+              aria-label="Dismiss notification"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <button
         onClick={() => router.push("/admin")}

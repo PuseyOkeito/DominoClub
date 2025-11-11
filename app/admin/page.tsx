@@ -343,11 +343,20 @@ export default function AdminPage() {
         }),
       })
 
-      const data = await response.json()
+      let data
+      try {
+        data = await response.json()
+      } catch (jsonError) {
+        console.error("[v0] Failed to parse response as JSON:", jsonError)
+        const text = await response.text()
+        console.error("[v0] Response text:", text)
+        alert(`Failed to create session: Invalid response from server`)
+        return
+      }
 
       if (!response.ok) {
-        const errorMessage = data.error || "Failed to create session"
-        console.error("[v0] Error creating session:", errorMessage)
+        const errorMessage = data.error || `HTTP ${response.status}: ${response.statusText}`
+        console.error("[v0] Error creating session:", errorMessage, data)
         alert(`Failed to create session: ${errorMessage}`)
         return
       }

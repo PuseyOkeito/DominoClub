@@ -254,10 +254,27 @@ export default function WaitingRoom() {
       })
       .subscribe()
 
+    const gameTablesChannel = supabase
+      .channel("game-tables-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "game_tables" }, async (payload) => {
+        console.log("[v0] Game table changed:", payload)
+        if (payload.new && (payload.new as any).status === "finished" && currentPlayerId) {
+          // Check if this table belongs to the current player
+          const changedTableNumber = (payload.new as any).table_number
+          if (changedTableNumber && tableNumber && changedTableNumber === tableNumber) {
+            console.log("[v0] 🏁 Round finished detected via realtime for table:", changedTableNumber)
+            setRoundFinished(true)
+            setShowGameStartedBanner(false)
+          }
+        }
+      })
+      .subscribe()
+
     return () => {
       supabase.removeChannel(playersChannel)
       supabase.removeChannel(teamsChannel)
       supabase.removeChannel(gameStateChannel)
+      supabase.removeChannel(gameTablesChannel)
     }
   }, [currentPlayerId, supabase, gameStarted])
 

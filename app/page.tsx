@@ -1,15 +1,26 @@
 "use client"
 import { CheckInForm } from "@/components/checkin-form"
 import { Settings } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 
 export default function Home() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isChecking, setIsChecking] = useState(true)
 
   useEffect(() => {
+    // Check for bypass parameter (e.g., ?new=true)
+    const forceNew = searchParams.get("new") === "true"
+    if (forceNew) {
+      console.log("[v0] Force new signup requested, clearing localStorage")
+      localStorage.removeItem("current-player-id")
+      localStorage.removeItem("session-players")
+      setIsChecking(false)
+      return
+    }
+
     const checkExistingPlayer = async () => {
       const currentPlayerId = localStorage.getItem("current-player-id")
       if (!currentPlayerId) {
@@ -44,7 +55,7 @@ export default function Home() {
     }
 
     checkExistingPlayer()
-  }, [router])
+  }, [router, searchParams])
 
   // Show loading state while checking
   if (isChecking) {
@@ -84,6 +95,20 @@ export default function Home() {
       >
         <Settings className="w-6 h-6 text-[#F2F7F7]" />
       </button>
+
+      {/* Clear session button - appears if player exists */}
+      {!isChecking && localStorage.getItem("current-player-id") && (
+        <button
+          onClick={() => {
+            localStorage.removeItem("current-player-id")
+            localStorage.removeItem("session-players")
+            window.location.reload()
+          }}
+          className="absolute top-6 left-6 z-20 px-4 py-2 rounded-lg bg-[#8b1c1f] text-[#F2F7F7] text-sm font-medium hover:bg-[#6b1c1f] transition-colors shadow-lg"
+        >
+          New Signup
+        </button>
+      )}
 
       <div className="relative z-10">
         <CheckInForm />

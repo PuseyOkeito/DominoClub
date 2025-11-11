@@ -215,13 +215,8 @@ export default function WaitingRoom() {
         if (payload.new && (payload.new as any).started) {
           setGameStarted(true)
           
-          // Check if user has already viewed their table - don't show banner if they have
-          const hasViewedTable = currentPlayerId ? localStorage.getItem(`table-viewed-${currentPlayerId}`) : null
-          if (hasViewedTable !== "true") {
-            setShowGameStartedBanner(true)
-          }
-          
           if (currentPlayerId) {
+            // Check if player has a table assigned before showing banner
             const { data: teamData1 } = await supabase
               .from("teams")
               .select("table_number")
@@ -239,7 +234,20 @@ export default function WaitingRoom() {
             if (teamData && teamData.table_number) {
               console.log("[v0] Player assigned to table via game state change:", teamData.table_number)
               setTableNumber(teamData.table_number)
+              
+              // Only show banner if player has table assigned
+              const hasViewedTable = localStorage.getItem(`table-viewed-${currentPlayerId}`)
+              if (hasViewedTable !== "true") {
+                setShowGameStartedBanner(true)
+              }
+            } else {
+              // Player doesn't have table yet - don't show banner
+              console.log("[v0] Game started but player not assigned to table yet")
+              setShowGameStartedBanner(false)
             }
+          } else {
+            // No current player ID - don't show banner
+            setShowGameStartedBanner(false)
           }
         }
       })
@@ -368,8 +376,13 @@ export default function WaitingRoom() {
 
         if (data.started) {
           const wasGameStarted = gameStarted
-          if (!wasGameStarted) {
-            console.log("[v0] 🎮 Game started! Checking player assignment...")
+          
+          // Always check player assignment first
+          await checkPlayerTableAssignment()
+          
+          // Only show banner if player actually has a table assigned
+          if (!wasGameStarted && tableNumber) {
+            console.log("[v0] 🎮 Game started! Player has table assigned:", tableNumber)
             setGameStarted(true)
             
             // Check if user has already viewed their table - don't show banner if they have
@@ -377,10 +390,18 @@ export default function WaitingRoom() {
             if (hasViewedTable !== "true") {
               setShowGameStartedBanner(true)
             }
+          } else if (!wasGameStarted && !tableNumber) {
+            // Game is started but player doesn't have a table yet - don't show banner
+            console.log("[v0] 🎮 Game started but player not assigned to table yet")
+            setGameStarted(true)
+            setShowGameStartedBanner(false)
+          } else if (wasGameStarted && tableNumber && !showGameStartedBanner) {
+            // Player just got assigned a table
+            const hasViewedTable = currentPlayerId ? localStorage.getItem(`table-viewed-${currentPlayerId}`) : null
+            if (hasViewedTable !== "true") {
+              setShowGameStartedBanner(true)
+            }
           }
-          
-          // Always check player assignment when game is started
-          await checkPlayerTableAssignment()
           
           // If game just started, check more aggressively
           if (!wasGameStarted) {
@@ -389,6 +410,13 @@ export default function WaitingRoom() {
             const aggressiveCheck = setInterval(async () => {
               checks++
               await checkPlayerTableAssignment()
+              // Show banner if table is assigned
+              if (tableNumber && !showGameStartedBanner) {
+                const hasViewedTable = currentPlayerId ? localStorage.getItem(`table-viewed-${currentPlayerId}`) : null
+                if (hasViewedTable !== "true") {
+                  setShowGameStartedBanner(true)
+                }
+              }
               if (checks >= 10 || tableNumber) {
                 clearInterval(aggressiveCheck)
               }

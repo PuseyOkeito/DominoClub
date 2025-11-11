@@ -32,13 +32,18 @@ export async function POST() {
     }
 
     // Reset game state to start fresh
-    // First reset to false, then set to true to trigger fresh state
-    await supabase
+    // Reset to false when clearing waiting players (new game cycle)
+    const { error: resetError } = await supabase
       .from("game_state")
       .update({ started: false, updated_at: new Date().toISOString() })
       .eq("id", "current")
 
-    // Now set started to true
+    if (resetError) {
+      console.error("[v0] Error resetting game state:", resetError)
+      // Continue anyway
+    }
+
+    // Now set started to true for the new game
     const { error } = await supabase
       .from("game_state")
       .update({ started: true, updated_at: new Date().toISOString() })

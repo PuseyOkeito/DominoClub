@@ -2,9 +2,20 @@
 import { CheckInForm } from "@/components/checkin-form"
 import { Settings } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 
 export default function Home() {
   const router = useRouter()
+
+  useEffect(() => {
+    // Check if player has already signed up
+    const currentPlayerId = localStorage.getItem("current-player-id")
+    if (currentPlayerId) {
+      // Player already exists, redirect to waiting room
+      console.log("[v0] Player already signed up, redirecting to waiting room")
+      router.push("/waiting-room")
+    }
+  }, [router])
 
   return (
     <main

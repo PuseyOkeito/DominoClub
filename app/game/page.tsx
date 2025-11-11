@@ -3,7 +3,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import { Suspense, useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { loadMatchmakingResults } from "@/lib/matchmaking"
+import { createClient } from "@/lib/supabase/client"
 
 const DominoScene = dynamic(() => import("@/components/domino-scene"), {
   ssr: false,
@@ -13,21 +13,84 @@ function GameContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const entryNumber = searchParams.get("entry") || "1"
-  const [tableId, setTableId] = useState<string | null>(null)
+  const [tableNumber, setTableNumber] = useState<number | null>(null)
+  const [partnerName, setPartnerName] = useState<string | null>(null)
+  const [playerName, setPlayerName] = useState<string | null>(null)
+  const supabase = createClient()
 
   useEffect(() => {
-    const { players, teams, tables } = loadMatchmakingResults()
-    if (players.length > 0 && tables.length > 0) {
-      const currentPlayer = players[0]
-      if (currentPlayer.tableId) {
-        setTableId(currentPlayer.tableId)
+    const loadPlayerData = async () => {
+      // Get current player ID from localStorage
+      const currentPlayerId = localStorage.getItem("current-player-id")
+      if (!currentPlayerId) {
+        console.log("[v0] No player ID found, redirecting to home")
+        router.push("/")
+        return
+      }
+
+      try {
+        // Get player data
+        const { data: playerData, error: playerError } = await supabase
+          .from("players")
+          .select("id, name, partner_name, table_id")
+          .eq("id", currentPlayerId)
+          .single()
+
+        if (playerError) {
+          console.error("[v0] Error loading player:", playerError)
+          return
+        }
+
+        if (playerData) {
+          setPlayerName(playerData.name)
+          setPartnerName(playerData.partner_name || null)
+
+          // Get table number from game_tables
+          if (playerData.table_id) {
+            const { data: tableData, error: tableError } = await supabase
+              .from("game_tables")
+              .select("table_number")
+              .eq("id", playerData.table_id)
+              .single()
+
+            if (!tableError && tableData) {
+              setTableNumber(tableData.table_number)
+            } else {
+              // Fallback: check teams table
+              const { data: teamData, error: teamError } = await supabase
+                .from("teams")
+                .select("table_number")
+                .or(`player1_id.eq.${currentPlayerId},player2_id.eq.${currentPlayerId}`)
+                .single()
+
+              if (!teamError && teamData && teamData.table_number) {
+                setTableNumber(teamData.table_number)
+              }
+            }
+          } else {
+            // No table_id, check teams table
+            const { data: teamData, error: teamError } = await supabase
+              .from("teams")
+              .select("table_number")
+              .or(`player1_id.eq.${currentPlayerId},player2_id.eq.${currentPlayerId}`)
+              .single()
+
+            if (!teamError && teamData && teamData.table_number) {
+              setTableNumber(teamData.table_number)
+            }
+          }
+        }
+      } catch (error) {
+        console.error("[v0] Error loading player data:", error)
       }
     }
-  }, [])
+
+    loadPlayerData()
+  }, [router, supabase])
 
   const handleReportResult = () => {
-    if (tableId) {
-      router.push(`/game-result?table=${tableId}`)
+    if (tableNumber) {
+      router.push(`/game-result?table=${tableNumber}`)
     }
   }
 
@@ -35,14 +98,28 @@ function GameContent() {
     <main className="relative min-h-screen">
       <DominoScene />
 
-      {/* Entry number overlay on the ground */}
+      {/* Table number and partner info overlay */}
       <div className="absolute inset-0 pointer-events-none flex items-end justify-center pb-32">
-        <div className="text-center">
-          <div className="text-[12rem] font-bold text-white/20 leading-none tracking-tighter">#{entryNumber}</div>
+        <div className="text-center space-y-4">
+          {tableNumber && (
+            <div className="text-[12rem] font-bold text-white/20 leading-none tracking-tighter">
+              Table {tableNumber}
+            </div>
+          )}
+          {partnerName && (
+            <div className="text-4xl font-semibold text-white/30 mt-4">
+              Partner: {partnerName}
+            </div>
+          )}
+          {entryNumber && (
+            <div className="text-6xl font-bold text-white/15 mt-2">
+              #{entryNumber}
+            </div>
+          )}
         </div>
       </div>
 
-      {tableId && (
+      {tableNumber && (
         <div className="absolute top-8 right-8 z-10">
           <Button
             size="lg"
